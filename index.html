@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Cochinita — Sistema</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F4F0;--surface:#FFF;--s2:#EFEDE8;
+  --bd:rgba(0,0,0,.08);--bd2:rgba(0,0,0,.14);
+  --t:#1A1916;--t2:#6B6860;--t3:#9E9C97;
+  --acc:#C0521A;--acc2:#FDF0EA;
+  --gn:#1A7A52;--gn2:#E8F5EE;
+  --am:#8A5C00;--am2:#FDF3DC;
+  --rd:#A52A2A;--rd2:#FAEAEA;
+  --r:12px;--rs:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* ── AUTH ──────────────────────────────────────────── */
+.auth-wrap{display:none;position:fixed;inset:0;background:var(--bg);z-index:999;align-items:center;justify-content:center;padding:20px;}
+.auth-wrap.show{display:flex;}
+.auth-card{background:#fff;border:1px solid var(--bd2);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08);}
+.auth-logo{font-size:20px;font-weight:600;color:var(--acc);margin-bottom:4px;}
+.auth-sub-logo{font-size:12px;color:var(--t3);margin-bottom:28px;}
+.auth-title{font-size:18px;font-weight:600;margin-bottom:20px;}
+.auth-field{margin-bottom:16px;}
+.auth-label{font-size:12px;color:var(--t2);display:block;margin-bottom:6px;font-weight:500;}
+.auth-input{width:100%;padding:10px 14px;border:1px solid var(--bd2);border-radius:8px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--t);outline:none;transition:border-color .15s;}
+.auth-input:focus{border-color:var(--acc);}
+.auth-btn{width:100%;padding:11px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s;}
+.auth-btn:hover{background:#a8471a;}
+.auth-err{background:var(--rd2);color:var(--rd);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none;}
+.auth-err.show{display:block;}
+
+/* ── NAV ───────────────────────────────────────────── */
+.nav{background:var(--surface);border-bottom:1px solid var(--bd);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{font-size:15px;font-weight:600;color:var(--acc);}
+.nav-brand span{color:var(--t3);font-weight:400;font-size:13px;margin-left:6px;}
+.nav-tabs{display:flex;gap:2px;margin-left:12px;}
+.ntb{padding:5px 12px;border-radius:6px;border:none;background:transparent;color:var(--t2);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.ntb:hover{background:var(--s2);color:var(--t);}
+.ntb.active{background:var(--acc);color:#fff;}
+.nav-user{display:flex;align-items:center;gap:8px;}
+.nu-name{font-size:12px;color:var(--t2);}
+.nu-role{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--s2);color:var(--t2);}
+.nu-role.admin{background:var(--acc);color:#fff;}
+.nu-role.caja{background:var(--am2);color:var(--am);}
+.nu-role.cocina{background:var(--gn2);color:var(--gn);}
+.logout-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--bd2);background:transparent;font-family:inherit;font-size:12px;color:var(--t2);cursor:pointer;}
+.logout-btn:hover{background:var(--rd2);color:var(--rd);border-color:var(--rd);}
+
+/* ── VIEWS ─────────────────────────────────────────── */
+.vw{display:none;padding:24px 20px;max-width:1100px;margin:0 auto;}
+.vw.active{display:block;}
+.pt{font-size:22px;font-weight:600;letter-spacing:-.4px;margin-bottom:4px;}
+.ps{font-size:13px;color:var(--t2);margin-bottom:20px;}
+
+/* ── TABLE WRAPPER ─────────────────────────────────── */
+.tw{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
+.th2{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.tt{font-size:14px;font-weight:600;}
+table{width:100%;border-collapse:collapse;}
+th{padding:9px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd);background:var(--bg);}
+td{padding:10px 16px;border-bottom:1px solid var(--bd);font-size:13px;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#FAFAF8;}
+
+/* ── BADGES ────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.bg{background:var(--gn2);color:var(--gn);}
+.br{background:var(--rd2);color:var(--rd);}
+.ba{background:var(--am2);color:var(--am);}
+
+/* ── BUTTONS ───────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:1px solid var(--bd2);background:transparent;font-family:inherit;font-size:13px;color:var(--t);cursor:pointer;transition:all .15s;}
+.btn:hover{background:var(--s2);}
+.btn-p{background:var(--acc);color:#fff;border-color:var(--acc);}
+.btn-p:hover{background:#a8471a;border-color:#a8471a;}
+.btn-sm{padding:4px 10px;font-size:12px;}
+.btn-danger{color:var(--rd);border-color:var(--rd);}
+.btn-danger:hover{background:var(--rd2);}
+
+/* ── INPUTS ────────────────────────────────────────── */
+.inp{padding:6px 12px;border:1px solid var(--bd2);border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--t);outline:none;}
+.inp:focus{border-color:var(--acc);}
+.sel{padding:6px 10px;border:1px solid var(--bd2);border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--t);outline:none;cursor:pointer;}
+
+/* ── MODAL ─────────────────────────────────────────── */
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.mov.open{display:flex;}
+.mo{background:var(--surface);border-radius:var(--r);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;}
+.moh{padding:20px 24px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;}
+.mot{font-size:16px;font-weight:600;}
+.mox{background:none;border:none;font-size:18px;cursor:pointer;color:var(--t2);padding:2px 6px;border-radius:4px;}
+.mox:hover{background:var(--s2);}
+.mob{padding:20px 24px;}
+.mof{padding:16px 24px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:8px;}
+.fld{margin-bottom:16px;}
+.flbl{font-size:12px;color:var(--t2);display:block;margin-bottom:6px;font-weight:500;}
+.finp{width:100%;padding:9px 12px;border:1px solid var(--bd2);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--t);outline:none;transition:border-color .15s;}
+.finp:focus{border-color:var(--acc);}
+
+/* ── CHIPS ─────────────────────────────────────────── */
+.fr{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.chip{padding:5px 12px;border-radius:20px;border:1px solid var(--bd2);background:var(--surface);font-size:12px;cursor:pointer;color:var(--t2);transition:all .15s;font-family:inherit;}
+.chip.active{background:var(--acc);color:#fff;border-color:var(--acc);}
+
+/* ── PLACEHOLDER ───────────────────────────────────── */
+.prox{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:56px;text-align:center;margin-top:8px;}
+.prox-ico{font-size:40px;margin-bottom:12px;}
+.prox-t{font-size:16px;font-weight:600;margin-bottom:6px;}
+.prox-s{font-size:13px;color:var(--t2);}
+
+/* ── TOAST ─────────────────────────────────────────── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--t);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.ok{background:var(--gn);}
+.toast.err{background:var(--rd);}
+
+/* ── MISC ──────────────────────────────────────────── */
+.precio{font-family:'DM Mono',monospace;font-size:13px;}
+.empty{padding:48px;text-align:center;color:var(--t3);font-size:13px;}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ── AUTH ─────────────────────────────────────────── -->
+<div class="auth-wrap show" id="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">🌮 La Cochinita</div>
+    <div class="auth-sub-logo">Sistema de gestión</div>
+    <div class="auth-title">Iniciar sesión</div>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="auth-field">
+      <label class="auth-label">Correo electrónico</label>
+      <input class="auth-input" type="email" id="auth-email" placeholder="correo@ejemplo.com" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Contraseña</label>
+      <input class="auth-input" type="password" id="auth-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="auth-btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- ── APP ──────────────────────────────────────────── -->
+<div id="app" style="display:none;">
+
+<nav class="nav">
+  <div style="display:flex;align-items:center;">
+    <span class="nav-brand">🌮 La Cochinita <span>sistema</span></span>
+    <div class="nav-tabs">
+      <button class="ntb" id="nb-pedidos"   onclick="sv('pedidos')"   style="display:none;">Pedidos</button>
+      <button class="ntb" id="nb-cocina"    onclick="sv('cocina')"    style="display:none;">🍳 Cocina</button>
+      <button class="ntb" id="nb-menu"      onclick="sv('menu')"      style="display:none;">Menú</button>
+      <button class="ntb" id="nb-gastos"    onclick="sv('gastos')"    style="display:none;">Gastos</button>
+      <button class="ntb" id="nb-dashboard" onclick="sv('dashboard')" style="display:none;">📊 Dashboard</button>
+    </div>
+  </div>
+  <div class="nav-user">
+    <span class="nu-name" id="nu-name">—</span>
+    <span class="nu-role" id="nu-role">—</span>
+    <button class="logout-btn" onclick="doLogout()">Salir</button>
+  </div>
+</nav>
+
+<!-- Pedidos (MVP 2) -->
+<div class="vw" id="vw-pedidos">
+  <div class="pt">Pedidos</div>
+  <div class="ps">Registro y seguimiento de órdenes</div>
+  <div class="prox">
+    <div class="prox-ico">🧾</div>
+    <div class="prox-t">Disponible en MVP 2</div>
+    <div class="prox-s">Aquí podrás levantar pedidos y enviarlos a cocina en tiempo real.</div>
+  </div>
+</div>
+
+<!-- Cocina KDS (MVP 2) -->
+<div class="vw" id="vw-cocina">
+  <div class="pt">Cocina</div>
+  <div class="ps">Vista de pedidos activos en tiempo real</div>
+  <div class="prox">
+    <div class="prox-ico">🍳</div>
+    <div class="prox-t">Disponible en MVP 2</div>
+    <div class="prox-s">Los pedidos llegarán aquí automáticamente para el equipo de cocina.</div>
+  </div>
+</div>
+
+<!-- Menú -->
+<div class="vw" id="vw-menu">
+  <div class="pt">Menú</div>
+  <div class="ps">Productos activos e inactivos del restaurante</div>
+  <div class="fr" id="cat-chips">
+    <button class="chip active" onclick="filtrarCat(null,this)">Todos</button>
+  </div>
+  <div class="tw">
+    <div class="th2">
+      <span class="tt" id="menu-count">Productos</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="inp" placeholder="Buscar producto..." oninput="renderProductos()" id="menu-q" style="width:190px;">
+        <button class="btn btn-p btn-sm" onclick="abrirModalProducto()">+ Agregar</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Categoría</th>
+          <th>Precio</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="menu-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Gastos (MVP 3) -->
+<div class="vw" id="vw-gastos">
+  <div class="pt">Gastos</div>
+  <div class="ps">Control de gastos fijos y variables</div>
+  <div class="prox">
+    <div class="prox-ico">💰</div>
+    <div class="prox-t">Disponible en MVP 3</div>
+    <div class="prox-s">Aquí registrarás y analizarás todos los gastos del negocio.</div>
+  </div>
+</div>
+
+<!-- Dashboard (MVP 4) -->
+<div class="vw" id="vw-dashboard">
+  <div class="pt">Dashboard</div>
+  <div class="ps">Análisis y tendencias de ventas</div>
+  <div class="prox">
+    <div class="prox-ico">📊</div>
+    <div class="prox-t">Disponible en MVP 4</div>
+    <div class="prox-s">Ventas, gastos, ticket promedio y tendencias del negocio en un solo lugar.</div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- ── MODAL PRODUCTO ────────────────────────────────── -->
+<div class="mov" id="mov-producto">
+  <div class="mo">
+    <div class="moh">
+      <div class="mot" id="mp-title">Agregar producto</div>
+      <button class="mox" onclick="cerrarModalProducto()">✕</button>
+    </div>
+    <div class="mob">
+      <input type="hidden" id="mp-id">
+      <div class="fld">
+        <label class="flbl">Nombre *</label>
+        <input class="finp" id="mp-nombre" placeholder="Ej. Cochinita pibil chica">
+      </div>
+      <div class="fld">
+        <label class="flbl">Categoría *</label>
+        <select class="finp" id="mp-cat"></select>
+      </div>
+      <div class="fld">
+        <label class="flbl">Precio (MXN) *</label>
+        <input class="finp" id="mp-precio" type="number" min="0" step="0.50" placeholder="0.00">
+      </div>
+      <div class="fld">
+        <label class="flbl">Descripción (opcional)</label>
+        <input class="finp" id="mp-desc" placeholder="Descripción breve del producto">
+      </div>
+    </div>
+    <div class="mof">
+      <button class="btn" onclick="cerrarModalProducto()">Cancelar</button>
+      <button class="btn btn-p" onclick="guardarProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE ──────────────────────────────────────────
+const SURL = 'https://wsjpupiltaqmzbterjty.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanB1cGlsdGFxbXpidGVyanR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3Mzc5MjIsImV4cCI6MjEwMDMxMzkyMn0.6C67wNVBZESOCj9ayLHsrFb2gyXwnSVkpRLk0Q_OeR8';
+const sb = supabase.createClient(SURL, SKEY);
+
+// ── STATE ─────────────────────────────────────────────
+let SESSION = null;
+let DB = { categorias: [], productos: [] };
+let catFiltro = null;
+
+// ── AUTH ──────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const err   = document.getElementById('auth-err');
+  err.classList.remove('show');
+
+  if (!email || !pass) {
+    err.textContent = 'Ingresa correo y contraseña.';
+    err.classList.add('show');
+    return;
+  }
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    err.textContent = 'Correo o contraseña incorrectos.';
+    err.classList.add('show');
+    return;
+  }
+
+  await initSession(data.user.id);
+}
+
+async function initSession(uid) {
+  const { data, error } = await sb.from('perfiles').select('*').eq('id', uid).single();
+  if (error || !data) {
+    await sb.auth.signOut();
+    const err = document.getElementById('auth-err');
+    err.textContent = 'Sin perfil asignado. Contacta al administrador.';
+    err.classList.add('show');
+    return;
+  }
+  if (!data.activo) {
+    await sb.auth.signOut();
+    const err = document.getElementById('auth-err');
+    err.textContent = 'Tu acceso está desactivado.';
+    err.classList.add('show');
+    return;
+  }
+  SESSION = data;
+  initApp();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  SESSION = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-wrap').classList.add('show');
+  document.getElementById('auth-email').value = '';
+  document.getElementById('auth-pass').value = '';
+}
+
+document.getElementById('auth-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── INIT APP ──────────────────────────────────────────
+async function initApp() {
+  document.getElementById('auth-wrap').classList.remove('show');
+  document.getElementById('app').style.display = 'block';
+
+  document.getElementById('nu-name').textContent = SESSION.nombre;
+  const roleEl = document.getElementById('nu-role');
+  roleEl.textContent = SESSION.rol;
+  roleEl.className = 'nu-role ' + SESSION.rol;
+
+  const rol = SESSION.rol;
+  if (rol === 'admin') {
+    ['pedidos','cocina','menu','gastos','dashboard'].forEach(t => {
+      document.getElementById('nb-' + t).style.display = '';
+    });
+    sv('menu');
+  } else if (rol === 'caja') {
+    document.getElementById('nb-pedidos').style.display = '';
+    sv('pedidos');
+  } else if (rol === 'cocina') {
+    document.getElementById('nb-cocina').style.display = '';
+    sv('cocina');
+  }
+
+  await cargarCategorias();
+  await cargarProductos();
+}
+
+// ── NAVIGATION ────────────────────────────────────────
+function sv(view) {
+  document.querySelectorAll('.vw').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.ntb').forEach(b => b.classList.remove('active'));
+  const vw = document.getElementById('vw-' + view);
+  const nb = document.getElementById('nb-' + view);
+  if (vw) vw.classList.add('active');
+  if (nb) nb.classList.add('active');
+}
+
+// ── DATA ──────────────────────────────────────────────
+async function cargarCategorias() {
+  const { data } = await sb.from('categorias').select('*').order('orden');
+  DB.categorias = data || [];
+  renderCatChips();
+  renderCatSelect();
+}
+
+async function cargarProductos() {
+  const { data } = await sb.from('productos').select('*, categorias(nombre)').order('nombre');
+  DB.productos = data || [];
+  renderProductos();
+}
+
+// ── RENDER ────────────────────────────────────────────
+function renderCatChips() {
+  const cont = document.getElementById('cat-chips');
+  cont.innerHTML = '<button class="chip active" onclick="filtrarCat(null,this)">Todos</button>';
+  DB.categorias.forEach(c => {
+    cont.innerHTML += `<button class="chip" onclick="filtrarCat(${c.id},this)">${c.nombre}</button>`;
+  });
+}
+
+function filtrarCat(id, el) {
+  catFiltro = id;
+  document.querySelectorAll('#cat-chips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderProductos();
+}
+
+function renderProductos() {
+  const q = (document.getElementById('menu-q')?.value || '').toLowerCase();
+  let lista = DB.productos;
+  if (catFiltro) lista = lista.filter(p => p.categoria_id === catFiltro);
+  if (q) lista = lista.filter(p => p.nombre.toLowerCase().includes(q));
+
+  document.getElementById('menu-count').textContent =
+    `${lista.length} producto${lista.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('menu-tbody');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin productos en esta categoría</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td>
+        <strong>${p.nombre}</strong>
+        ${p.descripcion ? `<br><span style="font-size:11px;color:var(--t3);">${p.descripcion}</span>` : ''}
+      </td>
+      <td>${p.categorias?.nombre || '—'}</td>
+      <td class="precio">$${parseFloat(p.precio).toFixed(2)}</td>
+      <td><span class="badge ${p.activo ? 'bg' : 'br'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-sm" onclick="abrirModalProducto(${p.id})">Editar</button>
+        <button class="btn btn-sm ${p.activo ? 'btn-danger' : ''}"
+          onclick="toggleActivo(${p.id},${p.activo})" style="margin-left:4px;">
+          ${p.activo ? 'Desactivar' : 'Activar'}
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderCatSelect() {
+  const sel = document.getElementById('mp-cat');
+  sel.innerHTML = DB.categorias.map(c =>
+    `<option value="${c.id}">${c.nombre}</option>`
+  ).join('');
+}
+
+// ── MODAL PRODUCTO ────────────────────────────────────
+function abrirModalProducto(id = null) {
+  const p = id ? DB.productos.find(x => x.id === id) : null;
+  document.getElementById('mp-title').textContent = p ? 'Editar producto' : 'Agregar producto';
+  document.getElementById('mp-id').value       = p?.id || '';
+  document.getElementById('mp-nombre').value   = p?.nombre || '';
+  document.getElementById('mp-cat').value      = p?.categoria_id || DB.categorias[0]?.id || '';
+  document.getElementById('mp-precio').value   = p?.precio || '';
+  document.getElementById('mp-desc').value     = p?.descripcion || '';
+  document.getElementById('mov-producto').classList.add('open');
+}
+
+function cerrarModalProducto() {
+  document.getElementById('mov-producto').classList.remove('open');
+}
+
+async function guardarProducto() {
+  const id     = document.getElementById('mp-id').value;
+  const nombre = document.getElementById('mp-nombre').value.trim();
+  const cat    = parseInt(document.getElementById('mp-cat').value);
+  const precio = parseFloat(document.getElementById('mp-precio').value);
+  const desc   = document.getElementById('mp-desc').value.trim();
+
+  if (!nombre)           { toast('Ingresa el nombre del producto', 'err'); return; }
+  if (!precio || precio <= 0) { toast('Ingresa un precio válido', 'err'); return; }
+
+  const payload = { nombre, categoria_id: cat, precio, descripcion: desc || null };
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('productos').update(payload).eq('id', parseInt(id)));
+  } else {
+    ({ error } = await sb.from('productos').insert(payload));
+  }
+
+  if (error) { toast('Error al guardar: ' + error.message, 'err'); return; }
+
+  cerrarModalProducto();
+  toast(id ? 'Producto actualizado ✓' : 'Producto agregado ✓', 'ok');
+  await cargarProductos();
+}
+
+async function toggleActivo(id, activo) {
+  const { error } = await sb.from('productos').update({ activo: !activo }).eq('id', id);
+  if (error) { toast('Error al actualizar', 'err'); return; }
+  toast(activo ? 'Producto desactivado' : 'Producto activado ✓', 'ok');
+  await cargarProductos();
+}
+
+// ── TOAST ─────────────────────────────────────────────
+function toast(msg, tipo = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (tipo ? ' ' + tipo : '');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── BOOT ──────────────────────────────────────────────
+(async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    await initSession(session.user.id);
+  }
+})();
+</script>
+</body>
+</html>
