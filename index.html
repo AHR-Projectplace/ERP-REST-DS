@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>La Cochinita — Sistema</title>
+<title>ERP Restaurante</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -18,6 +18,7 @@
   --gn:#1A7A52;--gn2:#E8F5EE;
   --am:#8A5C00;--am2:#FDF3DC;
   --rd:#A52A2A;--rd2:#FAEAEA;
+  --pu:#4A2A8A;--pu2:#F0EAFA;
   --r:12px;--rs:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -57,7 +58,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);font-s
 .logout-btn:hover{background:var(--rd2);color:var(--rd);border-color:var(--rd);}
 
 /* ── VIEWS ─────────────────────────────────────────── */
-.vw{display:none;padding:24px 20px;max-width:1100px;margin:0 auto;}
+.vw{display:none;padding:24px 20px;max-width:1200px;margin:0 auto;}
 .vw.active{display:block;}
 .pt{font-size:22px;font-weight:600;letter-spacing:-.4px;margin-bottom:4px;}
 .ps{font-size:13px;color:var(--t2);margin-bottom:20px;}
@@ -77,13 +78,19 @@ tr:hover td{background:#FAFAF8;}
 .bg{background:var(--gn2);color:var(--gn);}
 .br{background:var(--rd2);color:var(--rd);}
 .ba{background:var(--am2);color:var(--am);}
+.bgr{background:var(--s2);color:var(--t2);}
+.bpu{background:var(--pu2);color:var(--pu);}
 
 /* ── BUTTONS ───────────────────────────────────────── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:1px solid var(--bd2);background:transparent;font-family:inherit;font-size:13px;color:var(--t);cursor:pointer;transition:all .15s;}
 .btn:hover{background:var(--s2);}
 .btn-p{background:var(--acc);color:#fff;border-color:var(--acc);}
 .btn-p:hover{background:#a8471a;border-color:#a8471a;}
+.btn-gn{background:var(--gn);color:#fff;border-color:var(--gn);}
+.btn-gn:hover{background:#166645;border-color:#166645;}
+.btn-am{background:var(--am);color:#fff;border-color:var(--am);}
 .btn-sm{padding:4px 10px;font-size:12px;}
+.btn-lg{padding:12px 20px;font-size:15px;font-weight:600;}
 .btn-danger{color:var(--rd);border-color:var(--rd);}
 .btn-danger:hover{background:var(--rd2);}
 
@@ -127,6 +134,68 @@ tr:hover td{background:#FAFAF8;}
 /* ── MISC ──────────────────────────────────────────── */
 .precio{font-family:'DM Mono',monospace;font-size:13px;}
 .empty{padding:48px;text-align:center;color:var(--t3);font-size:13px;}
+
+/* ── PEDIDOS VIEW ──────────────────────────────────── */
+.pedidos-layout{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;}
+@media(max-width:800px){.pedidos-layout{grid-template-columns:1fr;}}
+
+.canal-sel{display:flex;gap:8px;margin-bottom:16px;}
+.canal-btn{flex:1;padding:10px;border-radius:8px;border:2px solid var(--bd2);background:var(--surface);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;}
+.canal-btn:hover{border-color:var(--acc);color:var(--acc);}
+.canal-btn.active{border-color:var(--acc);background:var(--acc2);color:var(--acc);font-weight:600;}
+
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:12px;}
+.prod-btn{background:var(--surface);border:1px solid var(--bd2);border-radius:var(--rs);padding:12px 10px;cursor:pointer;text-align:center;transition:all .15s;font-family:inherit;}
+.prod-btn:hover{border-color:var(--acc);background:var(--acc2);}
+.prod-btn:active{transform:scale(.97);}
+.prod-btn-name{font-size:12px;font-weight:600;color:var(--t);margin-bottom:4px;line-height:1.3;}
+.prod-btn-price{font-size:12px;color:var(--acc);font-family:'DM Mono',monospace;}
+
+.order-panel{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);position:sticky;top:68px;}
+.order-header{padding:14px 16px;border-bottom:1px solid var(--bd);font-size:14px;font-weight:600;}
+.order-items{min-height:120px;max-height:320px;overflow-y:auto;}
+.order-item{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--bd);}
+.order-item:last-child{border-bottom:none;}
+.order-item-name{flex:1;font-size:13px;}
+.qty-ctrl{display:flex;align-items:center;gap:6px;}
+.qty-btn{width:24px;height:24px;border-radius:50%;border:1px solid var(--bd2);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:all .15s;}
+.qty-btn:hover{background:var(--s2);}
+.qty-num{font-size:13px;font-weight:600;min-width:16px;text-align:center;font-family:'DM Mono',monospace;}
+.order-item-price{font-size:12px;color:var(--t2);font-family:'DM Mono',monospace;min-width:52px;text-align:right;}
+.order-empty{padding:32px 16px;text-align:center;color:var(--t3);font-size:12px;}
+.order-footer{padding:14px 16px;border-top:1px solid var(--bd);}
+.order-total{display:flex;justify-content:space-between;font-weight:600;font-size:15px;margin-bottom:12px;}
+.order-total span{font-family:'DM Mono',monospace;color:var(--acc);}
+.order-notas{width:100%;padding:8px 10px;border:1px solid var(--bd2);border-radius:6px;font-family:inherit;font-size:12px;background:var(--bg);color:var(--t);outline:none;resize:none;margin-bottom:10px;}
+.order-notas:focus{border-color:var(--acc);}
+.order-actions{display:flex;gap:8px;}
+
+/* ── KDS (COCINA) ──────────────────────────────────── */
+.kds-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.kds-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
+.kds-dot{width:8px;height:8px;border-radius:50%;background:var(--rd);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.kds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.kds-card{background:var(--surface);border-radius:var(--r);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.kds-card.nuevo{border:2px solid var(--rd);}
+.kds-card.en_preparacion{border:2px solid var(--am);}
+.kds-card.listo{border:2px solid var(--gn);opacity:.85;}
+.kds-card-head{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}
+.kds-card.nuevo .kds-card-head{background:var(--rd2);}
+.kds-card.en_preparacion .kds-card-head{background:var(--am2);}
+.kds-card.listo .kds-card-head{background:var(--gn2);}
+.kds-num{font-size:15px;font-weight:700;font-family:'DM Mono',monospace;}
+.kds-meta{display:flex;align-items:center;gap:6px;}
+.kds-time{font-size:11px;color:var(--t2);font-family:'DM Mono',monospace;}
+.kds-items{padding:10px 14px;border-bottom:1px solid var(--bd);}
+.kds-item{font-size:13px;padding:4px 0;display:flex;gap:8px;}
+.kds-item-qty{font-weight:700;color:var(--acc);min-width:20px;font-family:'DM Mono',monospace;}
+.kds-notas{padding:8px 14px;font-size:11px;color:var(--am);background:var(--am2);font-style:italic;}
+.kds-action{padding:10px 14px;}
+.kds-empty{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:56px;text-align:center;}
+
+/* ── HISTORIAL ─────────────────────────────────────── */
+.hist-section{margin-top:24px;}
 </style>
 </head>
 <body>
@@ -137,7 +206,7 @@ tr:hover td{background:#FAFAF8;}
 <!-- ── AUTH ─────────────────────────────────────────── -->
 <div class="auth-wrap show" id="auth-wrap">
   <div class="auth-card">
-    <div class="auth-logo">🌮 La Cochinita</div>
+    <div class="auth-logo">🍽️ ERP Restaurante</div>
     <div class="auth-sub-logo">Sistema de gestión</div>
     <div class="auth-title">Iniciar sesión</div>
     <div class="auth-err" id="auth-err"></div>
@@ -158,7 +227,7 @@ tr:hover td{background:#FAFAF8;}
 
 <nav class="nav">
   <div style="display:flex;align-items:center;">
-    <span class="nav-brand">🌮 La Cochinita <span>sistema</span></span>
+    <span class="nav-brand">🍽️ ERP Restaurante <span>sistema</span></span>
     <div class="nav-tabs">
       <button class="ntb" id="nb-pedidos"   onclick="sv('pedidos')"   style="display:none;">Pedidos</button>
       <button class="ntb" id="nb-cocina"    onclick="sv('cocina')"    style="display:none;">🍳 Cocina</button>
@@ -174,29 +243,93 @@ tr:hover td{background:#FAFAF8;}
   </div>
 </nav>
 
-<!-- Pedidos (MVP 2) -->
+<!-- ── PEDIDOS ──────────────────────────────────────── -->
 <div class="vw" id="vw-pedidos">
   <div class="pt">Pedidos</div>
-  <div class="ps">Registro y seguimiento de órdenes</div>
-  <div class="prox">
-    <div class="prox-ico">🧾</div>
-    <div class="prox-t">Disponible en MVP 2</div>
-    <div class="prox-s">Aquí podrás levantar pedidos y enviarlos a cocina en tiempo real.</div>
+  <div class="ps">Levanta una orden y envíala a cocina</div>
+
+  <div class="pedidos-layout">
+    <!-- Panel izquierdo: selector de productos -->
+    <div>
+      <!-- Canal -->
+      <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:14px;">
+        <div style="font-size:12px;color:var(--t2);font-weight:500;margin-bottom:10px;">Canal del pedido</div>
+        <div class="canal-sel">
+          <button class="canal-btn active" onclick="setCanal('mesa',this)">🪑 Mesa</button>
+          <button class="canal-btn" onclick="setCanal('llevar',this)">🛍️ Para llevar</button>
+          <button class="canal-btn" onclick="setCanal('app',this)">📱 App</button>
+        </div>
+        <div id="mesa-wrap">
+          <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Número de mesa</label>
+          <input class="inp" id="inp-mesa" placeholder="Ej. 3" style="width:120px;" oninput="actualizarMesa()">
+        </div>
+      </div>
+
+      <!-- Categorías -->
+      <div class="fr" id="caj-cat-chips">
+        <button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>
+      </div>
+
+      <!-- Grid de productos -->
+      <div class="prod-grid" id="prod-grid"></div>
+    </div>
+
+    <!-- Panel derecho: resumen del pedido -->
+    <div class="order-panel">
+      <div class="order-header">Orden actual</div>
+      <div class="order-items" id="order-items">
+        <div class="order-empty">Toca un producto para agregarlo</div>
+      </div>
+      <div class="order-footer">
+        <div class="order-total">Total <span id="order-total">$0.00</span></div>
+        <textarea class="order-notas" id="order-notas" rows="2" placeholder="Notas del pedido (opcional)..."></textarea>
+        <div class="order-actions">
+          <button class="btn btn-sm" onclick="limpiarPedido()" style="flex:1;">🗑 Limpiar</button>
+          <button class="btn btn-p" onclick="enviarPedido()" style="flex:2;">✓ Enviar a cocina</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial del día -->
+  <div class="hist-section">
+    <div class="tw">
+      <div class="th2">
+        <span class="tt">Pedidos del día</span>
+        <button class="btn btn-sm" onclick="cargarHistorial()">↻ Actualizar</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Total</th><th>Hora</th><th>Acción</th></tr>
+        </thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<!-- Cocina KDS (MVP 2) -->
+<!-- ── COCINA KDS ────────────────────────────────────── -->
 <div class="vw" id="vw-cocina">
-  <div class="pt">Cocina</div>
-  <div class="ps">Vista de pedidos activos en tiempo real</div>
-  <div class="prox">
-    <div class="prox-ico">🍳</div>
-    <div class="prox-t">Disponible en MVP 2</div>
-    <div class="prox-s">Los pedidos llegarán aquí automáticamente para el equipo de cocina.</div>
+  <div class="kds-header">
+    <div>
+      <div class="pt">Cocina</div>
+      <div class="ps" style="margin-bottom:0;">Pedidos activos en tiempo real</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="kds-badge"><span class="kds-dot"></span><span id="kds-count">0 pendientes</span></div>
+      <button class="btn btn-sm" onclick="cargarKDS()">↻ Actualizar</button>
+    </div>
+  </div>
+  <div class="kds-grid" id="kds-grid">
+    <div class="kds-empty">
+      <div style="font-size:32px;margin-bottom:10px;">✅</div>
+      <div style="font-weight:600;margin-bottom:4px;">Sin pedidos pendientes</div>
+      <div style="font-size:12px;color:var(--t2);">Los pedidos nuevos aparecerán aquí automáticamente</div>
+    </div>
   </div>
 </div>
 
-<!-- Menú -->
+<!-- ── MENÚ ──────────────────────────────────────────── -->
 <div class="vw" id="vw-menu">
   <div class="pt">Menú</div>
   <div class="ps">Productos activos e inactivos del restaurante</div>
@@ -213,20 +346,14 @@ tr:hover td{background:#FAFAF8;}
     </div>
     <table>
       <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Categoría</th>
-          <th>Precio</th>
-          <th>Estado</th>
-          <th>Acciones</th>
-        </tr>
+        <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>
       </thead>
       <tbody id="menu-tbody"></tbody>
     </table>
   </div>
 </div>
 
-<!-- Gastos (MVP 3) -->
+<!-- ── GASTOS (MVP 3) ────────────────────────────────── -->
 <div class="vw" id="vw-gastos">
   <div class="pt">Gastos</div>
   <div class="ps">Control de gastos fijos y variables</div>
@@ -237,7 +364,7 @@ tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
-<!-- Dashboard (MVP 4) -->
+<!-- ── DASHBOARD (MVP 4) ─────────────────────────────── -->
 <div class="vw" id="vw-dashboard">
   <div class="pt">Dashboard</div>
   <div class="ps">Análisis y tendencias de ventas</div>
@@ -290,9 +417,12 @@ const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const sb = supabase.createClient(SURL, SKEY);
 
 // ── STATE ─────────────────────────────────────────────
-let SESSION = null;
+let SESSION    = null;
+let realtimeSub = null;
 let DB = { categorias: [], productos: [] };
-let catFiltro = null;
+let catFiltro     = null;
+let cajaCatFiltro = null;
+let PEDIDO = { canal: 'mesa', mesa: '', notas: '', items: [] };
 
 // ── AUTH ──────────────────────────────────────────────
 async function doLogin() {
@@ -300,20 +430,9 @@ async function doLogin() {
   const pass  = document.getElementById('auth-pass').value;
   const err   = document.getElementById('auth-err');
   err.classList.remove('show');
-
-  if (!email || !pass) {
-    err.textContent = 'Ingresa correo y contraseña.';
-    err.classList.add('show');
-    return;
-  }
-
+  if (!email || !pass) { err.textContent = 'Ingresa correo y contraseña.'; err.classList.add('show'); return; }
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (error) {
-    err.textContent = 'Correo o contraseña incorrectos.';
-    err.classList.add('show');
-    return;
-  }
-
+  if (error) { err.textContent = 'Correo o contraseña incorrectos.'; err.classList.add('show'); return; }
   await initSession(data.user.id);
 }
 
@@ -323,27 +442,26 @@ async function initSession(uid) {
     await sb.auth.signOut();
     const err = document.getElementById('auth-err');
     err.textContent = 'Sin perfil asignado. Contacta al administrador.';
-    err.classList.add('show');
-    return;
+    err.classList.add('show'); return;
   }
   if (!data.activo) {
     await sb.auth.signOut();
     const err = document.getElementById('auth-err');
     err.textContent = 'Tu acceso está desactivado.';
-    err.classList.add('show');
-    return;
+    err.classList.add('show'); return;
   }
   SESSION = data;
   initApp();
 }
 
 async function doLogout() {
+  if (realtimeSub) { await sb.removeChannel(realtimeSub); realtimeSub = null; }
   await sb.auth.signOut();
   SESSION = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-wrap').classList.add('show');
   document.getElementById('auth-email').value = '';
-  document.getElementById('auth-pass').value = '';
+  document.getElementById('auth-pass').value  = '';
 }
 
 document.getElementById('auth-pass').addEventListener('keydown', e => {
@@ -354,18 +472,16 @@ document.getElementById('auth-pass').addEventListener('keydown', e => {
 async function initApp() {
   document.getElementById('auth-wrap').classList.remove('show');
   document.getElementById('app').style.display = 'block';
-
   document.getElementById('nu-name').textContent = SESSION.nombre;
   const roleEl = document.getElementById('nu-role');
   roleEl.textContent = SESSION.rol;
-  roleEl.className = 'nu-role ' + SESSION.rol;
+  roleEl.className   = 'nu-role ' + SESSION.rol;
 
   const rol = SESSION.rol;
   if (rol === 'admin') {
-    ['pedidos','cocina','menu','gastos','dashboard'].forEach(t => {
-      document.getElementById('nb-' + t).style.display = '';
-    });
-    sv('menu');
+    ['pedidos','cocina','menu','gastos','dashboard'].forEach(t =>
+      document.getElementById('nb-' + t).style.display = '');
+    sv('pedidos');
   } else if (rol === 'caja') {
     document.getElementById('nb-pedidos').style.display = '';
     sv('pedidos');
@@ -376,6 +492,9 @@ async function initApp() {
 
   await cargarCategorias();
   await cargarProductos();
+  await cargarHistorial();
+  await cargarKDS();
+  iniciarRealtime();
 }
 
 // ── NAVIGATION ────────────────────────────────────────
@@ -394,15 +513,259 @@ async function cargarCategorias() {
   DB.categorias = data || [];
   renderCatChips();
   renderCatSelect();
+  renderCajaCatChips();
 }
 
 async function cargarProductos() {
   const { data } = await sb.from('productos').select('*, categorias(nombre)').order('nombre');
   DB.productos = data || [];
   renderProductos();
+  renderProdGrid();
 }
 
-// ── RENDER ────────────────────────────────────────────
+// ── REALTIME ──────────────────────────────────────────
+function iniciarRealtime() {
+  if (realtimeSub) return;
+  realtimeSub = sb.channel('kds-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+      cargarKDS();
+      cargarHistorial();
+    })
+    .subscribe();
+}
+
+// ── PEDIDOS — CAJA ────────────────────────────────────
+function setCanal(canal, el) {
+  PEDIDO.canal = canal;
+  document.querySelectorAll('.canal-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('mesa-wrap').style.display = canal === 'mesa' ? 'block' : 'none';
+  if (canal !== 'mesa') PEDIDO.mesa = '';
+}
+
+function actualizarMesa() {
+  PEDIDO.mesa = document.getElementById('inp-mesa').value.trim();
+}
+
+function renderCajaCatChips() {
+  const cont = document.getElementById('caj-cat-chips');
+  cont.innerHTML = '<button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>';
+  DB.categorias.forEach(c => {
+    cont.innerHTML += `<button class="chip" onclick="filtrarCajaCat(${c.id},this)">${c.nombre}</button>`;
+  });
+}
+
+function filtrarCajaCat(id, el) {
+  cajaCatFiltro = id;
+  document.querySelectorAll('#caj-cat-chips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderProdGrid();
+}
+
+function renderProdGrid() {
+  let lista = DB.productos.filter(p => p.activo);
+  if (cajaCatFiltro) lista = lista.filter(p => p.categoria_id === cajaCatFiltro);
+  const grid = document.getElementById('prod-grid');
+  if (!lista.length) { grid.innerHTML = '<div class="empty">Sin productos en esta categoría</div>'; return; }
+  grid.innerHTML = lista.map(p => `
+    <button class="prod-btn" onclick="agregarItem(${p.id})">
+      <div class="prod-btn-name">${p.nombre}</div>
+      <div class="prod-btn-price">$${parseFloat(p.precio).toFixed(2)}</div>
+    </button>
+  `).join('');
+}
+
+function agregarItem(prodId) {
+  const prod = DB.productos.find(p => p.id === prodId);
+  if (!prod) return;
+  const existing = PEDIDO.items.find(i => i.producto_id === prodId);
+  if (existing) { existing.cantidad++; }
+  else { PEDIDO.items.push({ producto_id: prodId, nombre: prod.nombre, precio: prod.precio, cantidad: 1 }); }
+  renderOrden();
+}
+
+function cambiarCantidad(prodId, delta) {
+  const item = PEDIDO.items.find(i => i.producto_id === prodId);
+  if (!item) return;
+  item.cantidad += delta;
+  if (item.cantidad <= 0) PEDIDO.items = PEDIDO.items.filter(i => i.producto_id !== prodId);
+  renderOrden();
+}
+
+function renderOrden() {
+  const cont = document.getElementById('order-items');
+  if (!PEDIDO.items.length) {
+    cont.innerHTML = '<div class="order-empty">Toca un producto para agregarlo</div>';
+    document.getElementById('order-total').textContent = '$0.00';
+    return;
+  }
+  cont.innerHTML = PEDIDO.items.map(i => `
+    <div class="order-item">
+      <div class="order-item-name">${i.nombre}</div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="cambiarCantidad(${i.producto_id},-1)">−</button>
+        <span class="qty-num">${i.cantidad}</span>
+        <button class="qty-btn" onclick="cambiarCantidad(${i.producto_id},1)">+</button>
+      </div>
+      <div class="order-item-price">$${(i.precio * i.cantidad).toFixed(2)}</div>
+    </div>
+  `).join('');
+  const total = PEDIDO.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  document.getElementById('order-total').textContent = '$' + total.toFixed(2);
+}
+
+function limpiarPedido() {
+  PEDIDO.items = [];
+  PEDIDO.notas = '';
+  document.getElementById('order-notas').value = '';
+  renderOrden();
+}
+
+async function enviarPedido() {
+  if (!PEDIDO.items.length) { toast('Agrega al menos un producto', 'err'); return; }
+  if (PEDIDO.canal === 'mesa' && !document.getElementById('inp-mesa').value.trim()) {
+    toast('Ingresa el número de mesa', 'err'); return;
+  }
+
+  const total = PEDIDO.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const notas = document.getElementById('order-notas').value.trim();
+  const mesa  = PEDIDO.canal === 'mesa' ? document.getElementById('inp-mesa').value.trim() : null;
+
+  const { data: pedido, error: errPed } = await sb.from('pedidos')
+    .insert({ canal: PEDIDO.canal, mesa, estado: 'nuevo', notas: notas || null, total, creado_por: SESSION.id })
+    .select().single();
+
+  if (errPed) { toast('Error al crear pedido: ' + errPed.message, 'err'); return; }
+
+  const detalle = PEDIDO.items.map(i => ({
+    pedido_id: pedido.id,
+    producto_id: i.producto_id,
+    cantidad: i.cantidad,
+    precio_unitario: i.precio
+  }));
+
+  const { error: errDet } = await sb.from('detalle_pedido').insert(detalle);
+  if (errDet) { toast('Error al guardar detalle: ' + errDet.message, 'err'); return; }
+
+  toast(`Pedido #${pedido.id} enviado a cocina ✓`, 'ok');
+  limpiarPedido();
+  document.getElementById('inp-mesa').value = '';
+  PEDIDO.mesa = '';
+  await cargarHistorial();
+}
+
+// ── HISTORIAL ─────────────────────────────────────────
+async function cargarHistorial() {
+  const hoy = new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('pedidos')
+    .select('*')
+    .gte('created_at', hoy + 'T00:00:00')
+    .order('created_at', { ascending: false });
+
+  const tbody = document.getElementById('hist-tbody');
+  if (!tbody) return;
+  const lista = data || [];
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin pedidos hoy</td></tr>'; return;
+  }
+
+  const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En preparación', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
+  const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
+  const canalLabel  = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
+
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td class="precio">#${p.id}</td>
+      <td>${canalLabel[p.canal] || p.canal}</td>
+      <td>${p.mesa || '—'}</td>
+      <td><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado] || p.estado}</span></td>
+      <td class="precio">$${parseFloat(p.total).toFixed(2)}</td>
+      <td style="font-size:12px;color:var(--t2);">${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
+      <td>
+        ${p.estado === 'listo'
+          ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id})">Entregar</button>`
+          : p.estado === 'entregado' ? '<span style="color:var(--t3);font-size:12px;">✓ Entregado</span>' : '—'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function marcarEntregado(id) {
+  const { error } = await sb.from('pedidos').update({ estado: 'entregado' }).eq('id', id);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  toast('Pedido entregado ✓', 'ok');
+  await cargarHistorial();
+}
+
+// ── KDS — COCINA ──────────────────────────────────────
+async function cargarKDS() {
+  const { data } = await sb.from('pedidos')
+    .select('*, detalle_pedido(cantidad, precio_unitario, productos(nombre))')
+    .in('estado', ['nuevo', 'en_preparacion'])
+    .order('created_at', { ascending: true });
+
+  const lista = data || [];
+  const count = document.getElementById('kds-count');
+  if (count) count.textContent = lista.length + (lista.length === 1 ? ' pendiente' : ' pendientes');
+
+  const grid = document.getElementById('kds-grid');
+  if (!grid) return;
+
+  if (!lista.length) {
+    grid.innerHTML = `
+      <div class="kds-empty" style="grid-column:1/-1;">
+        <div style="font-size:32px;margin-bottom:10px;">✅</div>
+        <div style="font-weight:600;margin-bottom:4px;">Sin pedidos pendientes</div>
+        <div style="font-size:12px;color:var(--t2);">Los pedidos nuevos aparecerán aquí automáticamente</div>
+      </div>`;
+    return;
+  }
+
+  const canalLabel = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
+
+  grid.innerHTML = lista.map(p => {
+    const mins = Math.floor((Date.now() - new Date(p.created_at)) / 60000);
+    const tiempo = mins < 1 ? 'Ahora' : mins === 1 ? '1 min' : `${mins} min`;
+    const esNuevo = p.estado === 'nuevo';
+    const btnLabel = esNuevo ? '▶ Iniciar preparación' : '✓ Marcar listo';
+    const btnClass = esNuevo ? 'btn btn-am' : 'btn btn-gn';
+    const nextEst  = esNuevo ? 'en_preparacion' : 'listo';
+
+    const items = (p.detalle_pedido || []).map(d =>
+      `<div class="kds-item"><span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}</div>`
+    ).join('');
+
+    return `
+      <div class="kds-card ${p.estado}">
+        <div class="kds-card-head">
+          <span class="kds-num">#${p.id}</span>
+          <div class="kds-meta">
+            <span style="font-size:12px;">${canalLabel[p.canal] || p.canal}${p.mesa ? ' · ' + p.mesa : ''}</span>
+            <span class="kds-time">⏱ ${tiempo}</span>
+          </div>
+        </div>
+        <div class="kds-items">${items}</div>
+        ${p.notas ? `<div class="kds-notas">📝 ${p.notas}</div>` : ''}
+        <div class="kds-action">
+          <button class="${btnClass}" style="width:100%;" onclick="avanzarEstado(${p.id},'${nextEst}')">
+            ${btnLabel}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function avanzarEstado(id, nuevoEstado) {
+  const { error } = await sb.from('pedidos').update({ estado: nuevoEstado, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  const msg = nuevoEstado === 'en_preparacion' ? 'Preparación iniciada' : 'Pedido listo ✓';
+  toast(msg, 'ok');
+  await cargarKDS();
+  await cargarHistorial();
+}
+
+// ── MENÚ ──────────────────────────────────────────────
 function renderCatChips() {
   const cont = document.getElementById('cat-chips');
   cont.innerHTML = '<button class="chip active" onclick="filtrarCat(null,this)">Todos</button>';
@@ -423,29 +786,18 @@ function renderProductos() {
   let lista = DB.productos;
   if (catFiltro) lista = lista.filter(p => p.categoria_id === catFiltro);
   if (q) lista = lista.filter(p => p.nombre.toLowerCase().includes(q));
-
-  document.getElementById('menu-count').textContent =
-    `${lista.length} producto${lista.length !== 1 ? 's' : ''}`;
-
+  document.getElementById('menu-count').textContent = `${lista.length} producto${lista.length !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('menu-tbody');
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin productos en esta categoría</td></tr>';
-    return;
-  }
-
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin productos en esta categoría</td></tr>'; return; }
   tbody.innerHTML = lista.map(p => `
     <tr>
-      <td>
-        <strong>${p.nombre}</strong>
-        ${p.descripcion ? `<br><span style="font-size:11px;color:var(--t3);">${p.descripcion}</span>` : ''}
-      </td>
+      <td><strong>${p.nombre}</strong>${p.descripcion ? `<br><span style="font-size:11px;color:var(--t3);">${p.descripcion}</span>` : ''}</td>
       <td>${p.categorias?.nombre || '—'}</td>
       <td class="precio">$${parseFloat(p.precio).toFixed(2)}</td>
       <td><span class="badge ${p.activo ? 'bg' : 'br'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" onclick="abrirModalProducto(${p.id})">Editar</button>
-        <button class="btn btn-sm ${p.activo ? 'btn-danger' : ''}"
-          onclick="toggleActivo(${p.id},${p.activo})" style="margin-left:4px;">
+        <button class="btn btn-sm ${p.activo ? 'btn-danger' : ''}" onclick="toggleActivo(${p.id},${p.activo})" style="margin-left:4px;">
           ${p.activo ? 'Desactivar' : 'Activar'}
         </button>
       </td>
@@ -455,20 +807,18 @@ function renderProductos() {
 
 function renderCatSelect() {
   const sel = document.getElementById('mp-cat');
-  sel.innerHTML = DB.categorias.map(c =>
-    `<option value="${c.id}">${c.nombre}</option>`
-  ).join('');
+  sel.innerHTML = DB.categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
 
 // ── MODAL PRODUCTO ────────────────────────────────────
 function abrirModalProducto(id = null) {
   const p = id ? DB.productos.find(x => x.id === id) : null;
   document.getElementById('mp-title').textContent = p ? 'Editar producto' : 'Agregar producto';
-  document.getElementById('mp-id').value       = p?.id || '';
-  document.getElementById('mp-nombre').value   = p?.nombre || '';
-  document.getElementById('mp-cat').value      = p?.categoria_id || DB.categorias[0]?.id || '';
-  document.getElementById('mp-precio').value   = p?.precio || '';
-  document.getElementById('mp-desc').value     = p?.descripcion || '';
+  document.getElementById('mp-id').value     = p?.id || '';
+  document.getElementById('mp-nombre').value = p?.nombre || '';
+  document.getElementById('mp-cat').value    = p?.categoria_id || DB.categorias[0]?.id || '';
+  document.getElementById('mp-precio').value = p?.precio || '';
+  document.getElementById('mp-desc').value   = p?.descripcion || '';
   document.getElementById('mov-producto').classList.add('open');
 }
 
@@ -482,21 +832,13 @@ async function guardarProducto() {
   const cat    = parseInt(document.getElementById('mp-cat').value);
   const precio = parseFloat(document.getElementById('mp-precio').value);
   const desc   = document.getElementById('mp-desc').value.trim();
-
-  if (!nombre)           { toast('Ingresa el nombre del producto', 'err'); return; }
+  if (!nombre)          { toast('Ingresa el nombre del producto', 'err'); return; }
   if (!precio || precio <= 0) { toast('Ingresa un precio válido', 'err'); return; }
-
   const payload = { nombre, categoria_id: cat, precio, descripcion: desc || null };
-
   let error;
-  if (id) {
-    ({ error } = await sb.from('productos').update(payload).eq('id', parseInt(id)));
-  } else {
-    ({ error } = await sb.from('productos').insert(payload));
-  }
-
+  if (id) { ({ error } = await sb.from('productos').update(payload).eq('id', parseInt(id))); }
+  else    { ({ error } = await sb.from('productos').insert(payload)); }
   if (error) { toast('Error al guardar: ' + error.message, 'err'); return; }
-
   cerrarModalProducto();
   toast(id ? 'Producto actualizado ✓' : 'Producto agregado ✓', 'ok');
   await cargarProductos();
@@ -520,9 +862,7 @@ function toast(msg, tipo = '') {
 // ── BOOT ──────────────────────────────────────────────
 (async function boot() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) {
-    await initSession(session.user.id);
-  }
+  if (session?.user) await initSession(session.user.id);
 })();
 </script>
 </body>
