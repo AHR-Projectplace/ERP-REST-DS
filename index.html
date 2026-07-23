@@ -281,6 +281,7 @@ tr:hover td{background:#FAFAF8;}
       <button class="ntb" id="nb-menu"      onclick="sv('menu')"      style="display:none;">Menú</button>
       <button class="ntb" id="nb-gastos"    onclick="sv('gastos')"    style="display:none;">Gastos</button>
       <button class="ntb" id="nb-dashboard" onclick="sv('dashboard');cargarDashboard()" style="display:none;">📊 Dashboard</button>
+      <button class="ntb" id="nb-usuarios" onclick="sv('usuarios');cargarUsuarios()" style="display:none;">👥 Usuarios</button>
     </div>
   </div>
   <div class="nav-user">
@@ -580,7 +581,82 @@ tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
+<!-- ── USUARIOS ───────────────────────────────────────── -->
+<div class="vw" id="vw-usuarios">
+  <div class="pt">Usuarios</div>
+  <div class="ps">Gestión de accesos al sistema</div>
+
+  <div class="tw" style="margin-bottom:24px;">
+    <div class="th2">
+      <span class="tt" id="users-count">Usuarios</span>
+      <button class="btn btn-p btn-sm" onclick="abrirModalUsuario()">+ Nuevo usuario</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Registro de auditoría -->
+  <div class="tw">
+    <div class="th2">
+      <span class="tt">Registro de actividad</span>
+      <button class="btn btn-sm" onclick="cargarAuditLog()">↻ Actualizar</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>Fecha / Hora</th><th>Acción</th><th>Detalle</th><th>Por</th></tr>
+        </thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 </div><!-- /app -->
+
+<!-- ── MODAL USUARIO ─────────────────────────────────── -->
+<div class="mov" id="mov-usuario">
+  <div class="mo">
+    <div class="moh">
+      <div class="mot" id="mu-title">Nuevo usuario</div>
+      <button class="mox" onclick="cerrarModalUsuario()">✕</button>
+    </div>
+    <div class="mob">
+      <input type="hidden" id="mu-id">
+      <div class="fld">
+        <label class="flbl">Nombre completo *</label>
+        <input class="finp" id="mu-nombre" placeholder="Ej. María García">
+      </div>
+      <div class="fld" id="mu-email-wrap">
+        <label class="flbl">Correo electrónico *</label>
+        <input class="finp" id="mu-email" type="email" placeholder="correo@ejemplo.com">
+      </div>
+      <div class="fld" id="mu-pass-wrap">
+        <label class="flbl">Contraseña *</label>
+        <input class="finp" id="mu-pass" type="password" placeholder="Mínimo 6 caracteres">
+        <div style="font-size:11px;color:var(--t2);margin-top:4px;">El usuario podrá cambiarla más adelante.</div>
+      </div>
+      <div class="fld">
+        <label class="flbl">Rol *</label>
+        <select class="finp" id="mu-rol">
+          <option value="caja">Caja — levanta y gestiona pedidos</option>
+          <option value="cocina">Cocina — ve pedidos en tiempo real</option>
+          <option value="admin">Admin — acceso completo</option>
+        </select>
+      </div>
+    </div>
+    <div class="mof">
+      <button class="btn" onclick="cerrarModalUsuario()">Cancelar</button>
+      <button class="btn btn-p" onclick="guardarUsuario()">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── MODAL SUBCATEGORÍAS ───────────────────────────── -->
 <div class="mov" id="mov-subcat-gestion">
@@ -710,6 +786,7 @@ let catFiltro = null, cajaCatFiltro = null, cajSubCatFiltro = null;
 let PEDIDO = { canal: 'mesa', mesa: '', items: [] };
 let comensalesActual = 1;
 let detalleByPedido  = {};
+let USUARIOS_DATA    = [];
 
 // ── CONFIRM MODAL ─────────────────────────────────────
 function abrirConfirm(msg, callback, btnLabel = 'Confirmar') {
@@ -782,7 +859,7 @@ async function initApp() {
 
   const rol = SESSION.rol;
   if (rol === 'admin') {
-    ['pedidos','cocina','menu','gastos','dashboard'].forEach(t =>
+    ['pedidos','cocina','menu','gastos','dashboard','usuarios'].forEach(t =>
       document.getElementById('nb-' + t).style.display = '');
     sv('pedidos');
   } else if (rol === 'caja') {
@@ -1075,6 +1152,7 @@ function cancelarPedido(id) {
       const { error } = await sb.from('pedidos')
         .update({ estado: 'cancelado', updated_at: new Date().toISOString() }).eq('id', id);
       if (error) { toast('Error: ' + error.message, 'err'); return; }
+      await logAction('pedido_cancelado', 'pedidos', id, `Pedido #${id} cancelado`);
       toast(`Pedido #${id} cancelado`, 'ok');
       await cargarHistorial();
     },
@@ -1256,6 +1334,7 @@ function borrarGasto(id, desc) {
     async () => {
       const { error } = await sb.from('gastos').update({ erased: true }).eq('id', id);
       if (error) { toast('Error: ' + error.message, 'err'); return; }
+      await logAction('gasto_eliminado', 'gastos', id, `"${desc}"`);
       toast('Gasto eliminado', 'ok');
       await cargarGastos();
     },
@@ -1967,6 +2046,159 @@ function renderGraficaSubcat() {
         <div class="top-item-bar"><div class="top-item-fill" style="width:${pct}%;background:var(--am);"></div></div>
       </div>`;
   }).join('');
+}
+
+// ── AUDITORÍA ─────────────────────────────────────────
+async function logAction(accion, entidad, entidadId, detalle) {
+  if (!SESSION?.id) return;
+  try {
+    await sb.from('audit_logs').insert({
+      accion, entidad, entidad_id: String(entidadId),
+      detalle, usuario_id: SESSION.id
+    });
+  } catch(e) { /* silencioso — no bloquear la acción principal */ }
+}
+
+async function cargarAuditLog() {
+  const { data } = await sb.from('audit_logs')
+    .select('*, perfiles(nombre)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  const tbody = document.getElementById('audit-tbody');
+  if (!tbody) return;
+  const lista = data || [];
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">Sin actividad registrada</td></tr>'; return; }
+  const accionLabel = {
+    pedido_cancelado:'Pedido cancelado', gasto_eliminado:'Gasto eliminado',
+    usuario_creado:'Usuario creado', usuario_desactivado:'Usuario desactivado',
+    usuario_activado:'Usuario activado', subcat_borrada:'Subcategoría eliminada'
+  };
+  tbody.innerHTML = lista.map(l => `
+    <tr>
+      <td style="font-size:11px;white-space:nowrap;">${new Date(l.created_at).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+      <td><span class="badge bgr">${accionLabel[l.accion] || l.accion}</span></td>
+      <td style="font-size:12px;">${l.detalle || '—'}</td>
+      <td style="font-size:12px;color:var(--t2);">${l.perfiles?.nombre || '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── GESTIÓN DE USUARIOS ───────────────────────────────
+async function cargarUsuarios() {
+  const { data } = await sb.from('perfiles').select('*').order('nombre');
+  USUARIOS_DATA = data || [];
+  renderUsuarios();
+  await cargarAuditLog();
+}
+
+function renderUsuarios() {
+  const countEl = document.getElementById('users-count');
+  if (countEl) countEl.textContent = `${USUARIOS_DATA.length} usuario${USUARIOS_DATA.length !== 1 ? 's' : ''}`;
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  if (!USUARIOS_DATA.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin usuarios</td></tr>'; return; }
+  const rolLabel = { admin:'Admin', caja:'Caja', cocina:'Cocina' };
+  const rolBadge = { admin:'br', caja:'ba', cocina:'bg' };
+  tbody.innerHTML = USUARIOS_DATA.map(u => `
+    <tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td style="font-size:12px;color:var(--t2);">${u.email || '—'}</td>
+      <td><span class="badge ${rolBadge[u.rol] || 'bgr'}">${rolLabel[u.rol] || u.rol}</span></td>
+      <td><span class="badge ${u.activo ? 'bg' : 'bgr'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td style="white-space:nowrap;display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="abrirModalUsuario('${u.id}')">Editar</button>
+        <button class="btn btn-sm ${u.activo ? 'btn-danger' : ''}"
+          onclick="toggleUsuarioActivo('${u.id}',${u.activo},'${u.nombre.replace(/'/g,"\\'")}')">
+          ${u.activo ? 'Desactivar' : 'Activar'}
+        </button>
+        ${u.email ? `<button class="btn btn-sm" onclick="resetPasswordUsuario('${u.email}','${u.nombre.replace(/'/g,"\\'")}')">Reset pwd</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function abrirModalUsuario(id = null) {
+  const u = id ? USUARIOS_DATA.find(x => x.id === id) : null;
+  document.getElementById('mu-title').textContent = u ? 'Editar usuario' : 'Nuevo usuario';
+  document.getElementById('mu-id').value     = u?.id || '';
+  document.getElementById('mu-nombre').value = u?.nombre || '';
+  document.getElementById('mu-email').value  = u?.email || '';
+  document.getElementById('mu-pass').value   = '';
+  document.getElementById('mu-rol').value    = u?.rol || 'caja';
+  // En modo edición ocultar email y contraseña (no se pueden cambiar desde aquí)
+  document.getElementById('mu-email-wrap').style.display = u ? 'none' : 'block';
+  document.getElementById('mu-pass-wrap').style.display  = u ? 'none' : 'block';
+  document.getElementById('mov-usuario').classList.add('open');
+}
+
+function cerrarModalUsuario() {
+  document.getElementById('mov-usuario').classList.remove('open');
+}
+
+async function guardarUsuario() {
+  const id     = document.getElementById('mu-id').value;
+  const nombre = document.getElementById('mu-nombre').value.trim();
+  const rol    = document.getElementById('mu-rol').value;
+
+  if (!nombre) { toast('Ingresa el nombre', 'err'); return; }
+
+  if (id) {
+    // Editar: solo nombre y rol
+    const { error } = await sb.from('perfiles').update({ nombre, rol }).eq('id', id);
+    if (error) { toast('Error: ' + error.message, 'err'); return; }
+    toast('Usuario actualizado ✓', 'ok');
+  } else {
+    // Crear nuevo usuario
+    const email = document.getElementById('mu-email').value.trim();
+    const pass  = document.getElementById('mu-pass').value;
+    if (!email) { toast('Ingresa el correo', 'err'); return; }
+    if (!pass || pass.length < 6) { toast('La contraseña debe tener al menos 6 caracteres', 'err'); return; }
+
+    // Cliente temporal sin persistencia para no afectar sesión del admin
+    const sbTemp = supabase.createClient(SURL, SKEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+    const { data: newUser, error: errAuth } = await sbTemp.auth.signUp({ email, password: pass });
+    if (errAuth) { toast('Error al crear acceso: ' + errAuth.message, 'err'); return; }
+    if (!newUser?.user?.id) { toast('No se pudo obtener el ID del usuario creado', 'err'); return; }
+
+    const { error: errPerf } = await sb.from('perfiles')
+      .insert({ id: newUser.user.id, nombre, rol, email, activo: true });
+    if (errPerf) { toast('Error al registrar perfil: ' + errPerf.message, 'err'); return; }
+
+    await logAction('usuario_creado', 'perfiles', newUser.user.id, `${nombre} (${rol}) · ${email}`);
+    toast(`Usuario ${nombre} creado ✓`, 'ok');
+  }
+
+  cerrarModalUsuario();
+  await cargarUsuarios();
+}
+
+async function toggleUsuarioActivo(id, activo, nombre) {
+  if (id === SESSION.id) { toast('No puedes desactivar tu propia cuenta', 'err'); return; }
+  abrirConfirm(
+    `¿${activo ? 'Desactivar' : 'Activar'} al usuario "${nombre}"?`,
+    async () => {
+      const { error } = await sb.from('perfiles').update({ activo: !activo }).eq('id', id);
+      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      await logAction(activo ? 'usuario_desactivado' : 'usuario_activado', 'perfiles', id, nombre);
+      toast(`${nombre} ${activo ? 'desactivado' : 'activado'} ✓`, 'ok');
+      await cargarUsuarios();
+    },
+    activo ? 'Sí, desactivar' : 'Sí, activar'
+  );
+}
+
+async function resetPasswordUsuario(email, nombre) {
+  abrirConfirm(
+    `¿Enviar enlace de restablecimiento de contraseña a ${nombre} (${email})?`,
+    async () => {
+      const { error } = await sb.auth.resetPasswordForEmail(email);
+      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      toast(`Enlace enviado a ${email} ✓`, 'ok');
+    },
+    'Sí, enviar enlace'
+  );
 }
 
 // ── TOAST ─────────────────────────────────────────────
