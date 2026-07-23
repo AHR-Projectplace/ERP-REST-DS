@@ -452,6 +452,21 @@ tr:hover td{background:#FAFAF8;}
     </div>
   </div>
 
+  <!-- Filtros de análisis -->
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);">
+    <span style="font-size:12px;font-weight:600;color:var(--t2);white-space:nowrap;">Filtrar por:</span>
+    <select class="sel" id="df-cat" onchange="updateDashSubcatOpts()" style="font-size:12px;">
+      <option value="">Todas las categorías</option>
+    </select>
+    <select class="sel" id="df-subcat" onchange="updateDashProdOpts();applyDashFiltro()" style="font-size:12px;">
+      <option value="">Todas las subcategorías</option>
+    </select>
+    <select class="sel" id="df-prod" onchange="applyDashFiltro()" style="font-size:12px;">
+      <option value="">Todos los productos</option>
+    </select>
+    <button class="btn btn-sm" onclick="limpiarFiltrosDash()">✕ Limpiar</button>
+  </div>
+
   <!-- Stat cards de ventas -->
   <div class="dash-sc-grid">
     <div class="sc acc">
@@ -496,6 +511,25 @@ tr:hover td{background:#FAFAF8;}
       <div class="dash-section-title">🏆 Top 5 productos</div>
       <div class="chart-box" style="min-height:212px;">
         <div id="top-productos-wrap"><div class="empty" style="padding:32px;">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráficas: ventas por categoría + subcategoría -->
+  <div class="charts-grid">
+    <div class="dash-section">
+      <div class="dash-section-title">🍽️ Ventas por categoría</div>
+      <div class="chart-box">
+        <div id="chart-cat-wrap" style="position:relative;min-height:200px;display:flex;align-items:center;justify-content:center;">
+          <canvas id="chart-cat"></canvas>
+          <div id="chart-cat-empty" class="empty" style="display:none;padding:40px;">Sin datos de ventas</div>
+        </div>
+      </div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">🏷️ Ventas por subcategoría</div>
+      <div class="chart-box" style="min-height:200px;">
+        <div id="chart-subcat-wrap"><div class="empty" style="padding:32px;">Cargando...</div></div>
       </div>
     </div>
   </div>
@@ -1331,6 +1365,8 @@ let DASH_DETALLES = [];
 let DASH_GASTOS   = [];
 let DASH_PREV_ING = 0;
 let chartVentas   = null;
+let chartCat      = null;
+let DASH_FILTRO   = { catId: null, subcatId: null, prodId: null };
 
 function setPeriod(period, el) {
   DASH_PERIOD = period;
@@ -1386,7 +1422,7 @@ async function cargarDashboard() {
   const ids = DASH_DATA.filter(p => p.estado !== 'cancelado').map(p => p.id);
   if (ids.length > 0) {
     const { data: det } = await sb.from('detalle_pedido')
-      .select('cantidad, precio_unitario, producto_id, productos(nombre)')
+      .select('pedido_id, cantidad, precio_unitario, producto_id, productos(nombre, categoria_id, subcategoria_id)')
       .in('pedido_id', ids);
     DASH_DETALLES = det || [];
   } else { DASH_DETALLES = []; }
@@ -1417,7 +1453,9 @@ async function cargarDashboard() {
   } else { DASH_PREV_ING = 0; }
 
   calcularIndicadores();
+  populateDashFilters();
   renderGraficaVentas();
+  renderGraficaCategoria();
   renderTopProductos();
   renderAnalisisGastos();
   renderHistorialCompleto();
@@ -1464,6 +1502,13 @@ function renderHistorialCompleto() {
   if (canalF)  lista = lista.filter(p => p.canal === canalF);
   if (estadoF) lista = lista.filter(p => p.estado === estadoF);
   if (pagoF)   lista = lista.filter(p => p.pago_estado === pagoF);
+  // Filtro por producto/categoría/subcategoría
+  const hasProdFiltro = DASH_FILTRO.catId || DASH_FILTRO.subcatId || DASH_FILTRO.prodId;
+  if (hasProdFiltro) {
+    const dets   = getDetallesFiltrados();
+    const pedIds = new Set(dets.map(d => d.pedido_id));
+    lista = lista.filter(p => pedIds.has(p.id));
+  }
 
   const countEl = document.getElementById('d-hist-count');
   if (countEl) countEl.textContent = `${lista.length} registro${lista.length !== 1 ? 's' : ''}`;
@@ -1528,12 +1573,26 @@ function renderGraficaVentas() {
   const emptyEl = document.getElementById('chart-ventas-empty');
   if (!canvas) return;
 
-  const activos = DASH_DATA.filter(p => p.estado !== 'cancelado');
-  const byDate  = {};
-  activos.forEach(p => {
-    const d = new Date(p.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'});
-    byDate[d] = (byDate[d] || 0) + parseFloat(p.total || 0);
-  });
+  const byDate    = {};
+  const hasFiltro = DASH_FILTRO.catId || DASH_FILTRO.subcatId || DASH_FILTRO.prodId;
+
+  if (hasFiltro) {
+    const dets       = getDetallesFiltrados();
+    const pedFechaMap = {};
+    DASH_DATA.forEach(p => { pedFechaMap[p.id] = p.created_at; });
+    dets.forEach(d => {
+      const ts = pedFechaMap[d.pedido_id];
+      if (!ts) return;
+      const key = new Date(ts).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'});
+      byDate[key] = (byDate[key] || 0) + d.cantidad * parseFloat(d.precio_unitario || 0);
+    });
+  } else {
+    const activos = DASH_DATA.filter(p => p.estado !== 'cancelado');
+    activos.forEach(p => {
+      const d = new Date(p.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'});
+      byDate[d] = (byDate[d] || 0) + parseFloat(p.total || 0);
+    });
+  }
 
   const labels = Object.keys(byDate).reverse();
   const values = labels.map(l => byDate[l]);
@@ -1553,7 +1612,7 @@ function renderGraficaVentas() {
     data: {
       labels,
       datasets: [{
-        label: 'Ventas',
+        label: hasFiltro ? 'Ventas filtradas' : 'Ventas',
         data: values,
         backgroundColor: 'rgba(192,82,26,.7)',
         borderColor: '#C0521A',
@@ -1575,17 +1634,18 @@ function renderGraficaVentas() {
 function renderTopProductos() {
   const cont = document.getElementById('top-productos-wrap');
   if (!cont) return;
-  if (!DASH_DETALLES.length) {
+  const dets = getDetallesFiltrados();
+  if (!dets.length) {
     cont.innerHTML = '<div class="empty" style="padding:32px;">Sin datos en este período</div>'; return;
   }
   const map = {};
-  DASH_DETALLES.forEach(d => {
+  dets.forEach(d => {
     const n = d.productos?.nombre || 'Desconocido';
     if (!map[n]) map[n] = { cantidad: 0, total: 0 };
     map[n].cantidad += d.cantidad;
     map[n].total    += d.cantidad * parseFloat(d.precio_unitario || 0);
   });
-  const top5   = Object.entries(map).sort((a,b) => b[1].cantidad - a[1].cantidad).slice(0,5);
+  const top5    = Object.entries(map).sort((a,b) => b[1].cantidad - a[1].cantidad).slice(0,5);
   const maxCant = top5[0]?.[1].cantidad || 1;
   const medals  = ['🥇','🥈','🥉','4️⃣','5️⃣'];
   cont.innerHTML = top5.map(([nombre, d], i) => {
@@ -1748,6 +1808,165 @@ function borrarSubcat(id, nombre) {
     },
     'Sí, borrar'
   );
+}
+
+// ── FILTROS DASHBOARD ─────────────────────────────────
+
+function getDetallesFiltrados() {
+  let d = [...DASH_DETALLES];
+  if (DASH_FILTRO.catId)    d = d.filter(x => x.productos?.categoria_id   === DASH_FILTRO.catId);
+  if (DASH_FILTRO.subcatId) d = d.filter(x => x.productos?.subcategoria_id === DASH_FILTRO.subcatId);
+  if (DASH_FILTRO.prodId)   d = d.filter(x => x.producto_id               === DASH_FILTRO.prodId);
+  return d;
+}
+
+function populateDashFilters() {
+  const selCat = document.getElementById('df-cat');
+  if (selCat) {
+    selCat.innerHTML = '<option value="">Todas las categorías</option>' +
+      DB.categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  }
+  const selProd = document.getElementById('df-prod');
+  if (selProd) {
+    selProd.innerHTML = '<option value="">Todos los productos</option>' +
+      DB.productos.filter(p => p.activo).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+  }
+}
+
+function updateDashSubcatOpts() {
+  const catId  = parseInt(document.getElementById('df-cat')?.value) || null;
+  const selSub = document.getElementById('df-subcat');
+  if (selSub) {
+    const subs = catId ? DB.subcategorias.filter(s => s.categoria_id === catId) : [];
+    selSub.innerHTML = '<option value="">Todas las subcategorías</option>' +
+      subs.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+  }
+  updateDashProdOpts();
+  applyDashFiltro();
+}
+
+function updateDashProdOpts() {
+  const catId    = parseInt(document.getElementById('df-cat')?.value)    || null;
+  const subcatId = parseInt(document.getElementById('df-subcat')?.value) || null;
+  const selProd  = document.getElementById('df-prod');
+  if (!selProd) return;
+  let prods = DB.productos.filter(p => p.activo);
+  if (catId)    prods = prods.filter(p => p.categoria_id    === catId);
+  if (subcatId) prods = prods.filter(p => p.subcategoria_id === subcatId);
+  selProd.innerHTML = '<option value="">Todos los productos</option>' +
+    prods.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+}
+
+function applyDashFiltro() {
+  DASH_FILTRO.catId    = parseInt(document.getElementById('df-cat')?.value)    || null;
+  DASH_FILTRO.subcatId = parseInt(document.getElementById('df-subcat')?.value) || null;
+  DASH_FILTRO.prodId   = parseInt(document.getElementById('df-prod')?.value)   || null;
+  renderGraficaVentas();
+  renderGraficaCategoria();
+  renderTopProductos();
+  renderHistorialCompleto();
+}
+
+function limpiarFiltrosDash() {
+  DASH_FILTRO = { catId: null, subcatId: null, prodId: null };
+  ['df-cat','df-subcat','df-prod'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  populateDashFilters();
+  renderGraficaVentas();
+  renderGraficaCategoria();
+  renderTopProductos();
+  renderAnalisisGastos();
+  renderHistorialCompleto();
+}
+
+// ── GRÁFICAS POR CATEGORÍA ────────────────────────────
+
+function renderGraficaCategoria() {
+  const canvas  = document.getElementById('chart-cat');
+  const emptyEl = document.getElementById('chart-cat-empty');
+  if (!canvas) return;
+
+  // Siempre muestra todas las categorías (no filtrado)
+  const byCat = {};
+  DASH_DETALLES.forEach(d => {
+    const cat    = DB.categorias.find(c => c.id === d.productos?.categoria_id);
+    const nombre = cat?.nombre || 'Sin categoría';
+    byCat[nombre] = (byCat[nombre] || 0) + d.cantidad * parseFloat(d.precio_unitario || 0);
+  });
+
+  if (chartCat) { chartCat.destroy(); chartCat = null; }
+
+  const labels = Object.keys(byCat);
+  const values = Object.values(byCat);
+
+  if (!labels.length) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    renderGraficaSubcat();
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const colors = ['rgba(192,82,26,.8)','rgba(26,122,82,.8)','rgba(138,92,0,.8)',
+                  'rgba(74,42,138,.8)','rgba(165,42,42,.8)','rgba(26,82,138,.8)'];
+
+  chartCat = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 12 }, padding: 12 } },
+        tooltip: { callbacks: {
+          label: ctx => ` $${ctx.raw.toLocaleString('es-MX',{minimumFractionDigits:0})} (${Math.round(ctx.parsed/values.reduce((a,b)=>a+b,0)*100)}%)`
+        }}
+      }
+    }
+  });
+
+  renderGraficaSubcat();
+}
+
+function renderGraficaSubcat() {
+  const cont = document.getElementById('chart-subcat-wrap');
+  if (!cont) return;
+
+  const bySub = {};
+  DASH_DETALLES.forEach(d => {
+    const sub    = DB.subcategorias.find(s => s.id === d.productos?.subcategoria_id);
+    if (!sub) return;
+    const cat    = DB.categorias.find(c => c.id === sub.categoria_id);
+    const nombre = `${cat?.nombre || ''} · ${sub.nombre}`;
+    bySub[nombre] = (bySub[nombre] || 0) + d.cantidad * parseFloat(d.precio_unitario || 0);
+  });
+
+  const entries = Object.entries(bySub).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) {
+    cont.innerHTML = '<div class="empty" style="padding:32px;">Sin subcategorías con ventas</div>'; return;
+  }
+  const max = entries[0]?.[1] || 1;
+  cont.innerHTML = entries.map(([nombre, total]) => {
+    const pct = Math.round((total / max) * 100);
+    return `
+      <div class="top-item">
+        <div class="top-item-label">
+          <span style="font-size:12px;">${nombre}</span>
+          <span style="font-family:'DM Mono',monospace;color:var(--t2);font-size:11px;">$${total.toFixed(0)}</span>
+        </div>
+        <div class="top-item-bar"><div class="top-item-fill" style="width:${pct}%;background:var(--am);"></div></div>
+      </div>`;
+  }).join('');
 }
 
 // ── TOAST ─────────────────────────────────────────────
