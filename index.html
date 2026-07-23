@@ -639,8 +639,12 @@ tr:hover td{background:#FAFAF8;}
       </div>
       <div class="fld" id="mu-pass-wrap">
         <label class="flbl">Contraseña *</label>
-        <input class="finp" id="mu-pass" type="password" placeholder="Mínimo 6 caracteres">
-        <div style="font-size:11px;color:var(--t2);margin-top:4px;">El usuario podrá cambiarla más adelante.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="finp" id="mu-pass" type="text" placeholder="Mínimo 6 caracteres" style="flex:1;font-family:'DM Mono',monospace;font-size:13px;">
+          <button class="btn btn-sm" type="button" onclick="generarPassword()" style="white-space:nowrap;">🔀 Generar</button>
+          <button class="btn btn-sm" type="button" id="mu-copy-btn" onclick="copiarPassword()" style="white-space:nowrap;">📋 Copiar</button>
+        </div>
+        <div style="font-size:11px;color:var(--t2);margin-top:4px;">Genera una contraseña segura y cópiala antes de guardar — no se podrá recuperar después.</div>
       </div>
       <div class="fld">
         <label class="flbl">Rol *</label>
@@ -2048,6 +2052,52 @@ function renderGraficaSubcat() {
   }).join('');
 }
 
+// ── GENERADOR DE CONTRASEÑA ───────────────────────────
+function generarPassword() {
+  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // sin I, O (confusos)
+  const lower   = 'abcdefghjkmnpqrstuvwxyz';    // sin i, l, o
+  const digits  = '23456789';                   // sin 0, 1 (confusos)
+  const symbols = '@#$%!&*';
+  const all     = upper + lower + digits + symbols;
+
+  // Garantizar al menos 1 de cada tipo (12 caracteres total)
+  let pwd = [
+    upper  [Math.floor(Math.random() * upper.length)],
+    upper  [Math.floor(Math.random() * upper.length)],
+    lower  [Math.floor(Math.random() * lower.length)],
+    lower  [Math.floor(Math.random() * lower.length)],
+    digits [Math.floor(Math.random() * digits.length)],
+    digits [Math.floor(Math.random() * digits.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+    ...Array.from({ length: 5 }, () => all[Math.floor(Math.random() * all.length)])
+  ];
+
+  // Mezclar con crypto.getRandomValues para máxima aleatoriedad
+  const arr = new Uint32Array(pwd.length);
+  crypto.getRandomValues(arr);
+  pwd = pwd.map((c, i) => ({ c, r: arr[i] })).sort((a, b) => a.r - b.r).map(x => x.c);
+
+  const campo = document.getElementById('mu-pass');
+  if (campo) {
+    campo.value = pwd.join('');
+    campo.type  = 'text'; // mostrar para que pueda copiarse
+  }
+  toast('Contraseña generada — cópiala antes de guardar', 'ok');
+}
+
+async function copiarPassword() {
+  const campo = document.getElementById('mu-pass');
+  if (!campo?.value) { toast('Genera una contraseña primero', 'err'); return; }
+  try {
+    await navigator.clipboard.writeText(campo.value);
+    const btn = document.getElementById('mu-copy-btn');
+    if (btn) { btn.textContent = '✓ Copiada'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000); }
+    toast('Contraseña copiada al portapapeles ✓', 'ok');
+  } catch {
+    toast('No se pudo copiar — selecciónala manualmente', 'err');
+  }
+}
+
 // ── AUDITORÍA ─────────────────────────────────────────
 async function logAction(accion, entidad, entidadId, detalle) {
   if (!SESSION?.id) return;
@@ -2133,6 +2183,8 @@ function abrirModalUsuario(id = null) {
 
 function cerrarModalUsuario() {
   document.getElementById('mov-usuario').classList.remove('open');
+  const campo = document.getElementById('mu-pass');
+  if (campo) { campo.value = ''; campo.type = 'text'; }
 }
 
 async function guardarUsuario() {
