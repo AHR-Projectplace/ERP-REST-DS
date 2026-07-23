@@ -73,6 +73,16 @@ td{padding:10px 16px;border-bottom:1px solid var(--bd);font-size:13px;}
 tr:last-child td{border-bottom:none;}
 tr:hover td{background:#FAFAF8;}
 
+/* ── STAT CARDS ────────────────────────────────────── */
+.sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;}
+.sc{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px 18px;}
+.sc-label{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.sc-val{font-size:22px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:-.5px;}
+.sc-sub{font-size:11px;color:var(--t2);margin-top:4px;}
+.sc.acc .sc-val{color:var(--acc);}
+.sc.gn  .sc-val{color:var(--gn);}
+.sc.am  .sc-val{color:var(--am);}
+
 /* ── BADGES ────────────────────────────────────────── */
 .badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;}
 .bg{background:var(--gn2);color:var(--gn);}
@@ -103,6 +113,7 @@ tr:hover td{background:#FAFAF8;}
 .mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:20px;}
 .mov.open{display:flex;}
 .mo{background:var(--surface);border-radius:var(--r);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;}
+.mo-sm{max-width:360px;}
 .moh{padding:20px 24px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;}
 .mot{font-size:16px;font-weight:600;}
 .mox{background:none;border:none;font-size:18px;cursor:pointer;color:var(--t2);padding:2px 6px;border-radius:4px;}
@@ -113,6 +124,7 @@ tr:hover td{background:#FAFAF8;}
 .flbl{font-size:12px;color:var(--t2);display:block;margin-bottom:6px;font-weight:500;}
 .finp{width:100%;padding:9px 12px;border:1px solid var(--bd2);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--t);outline:none;transition:border-color .15s;}
 .finp:focus{border-color:var(--acc);}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 
 /* ── CHIPS ─────────────────────────────────────────── */
 .fr{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
@@ -138,19 +150,16 @@ tr:hover td{background:#FAFAF8;}
 /* ── PEDIDOS VIEW ──────────────────────────────────── */
 .pedidos-layout{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;}
 @media(max-width:800px){.pedidos-layout{grid-template-columns:1fr;}}
-
 .canal-sel{display:flex;gap:8px;margin-bottom:16px;}
 .canal-btn{flex:1;padding:10px;border-radius:8px;border:2px solid var(--bd2);background:var(--surface);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;}
 .canal-btn:hover{border-color:var(--acc);color:var(--acc);}
 .canal-btn.active{border-color:var(--acc);background:var(--acc2);color:var(--acc);font-weight:600;}
-
 .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:12px;}
 .prod-btn{background:var(--surface);border:1px solid var(--bd2);border-radius:var(--rs);padding:12px 10px;cursor:pointer;text-align:center;transition:all .15s;font-family:inherit;}
 .prod-btn:hover{border-color:var(--acc);background:var(--acc2);}
 .prod-btn:active{transform:scale(.97);}
 .prod-btn-name{font-size:12px;font-weight:600;color:var(--t);margin-bottom:4px;line-height:1.3;}
 .prod-btn-price{font-size:12px;color:var(--acc);font-family:'DM Mono',monospace;}
-
 .order-panel{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);position:sticky;top:68px;}
 .order-header{padding:14px 16px;border-bottom:1px solid var(--bd);font-size:14px;font-weight:600;}
 .order-items{min-height:120px;max-height:320px;overflow-y:auto;}
@@ -170,7 +179,7 @@ tr:hover td{background:#FAFAF8;}
 .order-notas:focus{border-color:var(--acc);}
 .order-actions{display:flex;gap:8px;}
 
-/* ── KDS (COCINA) ──────────────────────────────────── */
+/* ── KDS ───────────────────────────────────────────── */
 .kds-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .kds-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
 .kds-dot{width:8px;height:8px;border-radius:50%;background:var(--rd);animation:pulse 1.5s infinite;}
@@ -193,14 +202,11 @@ tr:hover td{background:#FAFAF8;}
 .kds-notas{padding:8px 14px;font-size:11px;color:var(--am);background:var(--am2);font-style:italic;}
 .kds-action{padding:10px 14px;}
 .kds-empty{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:56px;text-align:center;}
-
-/* ── HISTORIAL ─────────────────────────────────────── */
 .hist-section{margin-top:24px;}
 </style>
 </head>
 <body>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <!-- ── AUTH ─────────────────────────────────────────── -->
@@ -247,11 +253,8 @@ tr:hover td{background:#FAFAF8;}
 <div class="vw" id="vw-pedidos">
   <div class="pt">Pedidos</div>
   <div class="ps">Levanta una orden y envíala a cocina</div>
-
   <div class="pedidos-layout">
-    <!-- Panel izquierdo: selector de productos -->
     <div>
-      <!-- Canal -->
       <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:14px;">
         <div style="font-size:12px;color:var(--t2);font-weight:500;margin-bottom:10px;">Canal del pedido</div>
         <div class="canal-sel">
@@ -264,17 +267,11 @@ tr:hover td{background:#FAFAF8;}
           <input class="inp" id="inp-mesa" placeholder="Ej. 3" style="width:120px;" oninput="actualizarMesa()">
         </div>
       </div>
-
-      <!-- Categorías -->
       <div class="fr" id="caj-cat-chips">
         <button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>
       </div>
-
-      <!-- Grid de productos -->
       <div class="prod-grid" id="prod-grid"></div>
     </div>
-
-    <!-- Panel derecho: resumen del pedido -->
     <div class="order-panel">
       <div class="order-header">Orden actual</div>
       <div class="order-items" id="order-items">
@@ -298,12 +295,14 @@ tr:hover td{background:#FAFAF8;}
         <span class="tt">Pedidos del día</span>
         <button class="btn btn-sm" onclick="cargarHistorial()">↻ Actualizar</button>
       </div>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Total</th><th>Hora</th><th>Acción</th></tr>
-        </thead>
-        <tbody id="hist-tbody"></tbody>
-      </table>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Pago</th><th>Total</th><th>Hora</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="hist-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -320,13 +319,7 @@ tr:hover td{background:#FAFAF8;}
       <button class="btn btn-sm" onclick="cargarKDS()">↻ Actualizar</button>
     </div>
   </div>
-  <div class="kds-grid" id="kds-grid">
-    <div class="kds-empty">
-      <div style="font-size:32px;margin-bottom:10px;">✅</div>
-      <div style="font-weight:600;margin-bottom:4px;">Sin pedidos pendientes</div>
-      <div style="font-size:12px;color:var(--t2);">Los pedidos nuevos aparecerán aquí automáticamente</div>
-    </div>
-  </div>
+  <div class="kds-grid" id="kds-grid"></div>
 </div>
 
 <!-- ── MENÚ ──────────────────────────────────────────── -->
@@ -353,14 +346,39 @@ tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
-<!-- ── GASTOS (MVP 3) ────────────────────────────────── -->
+<!-- ── GASTOS ────────────────────────────────────────── -->
 <div class="vw" id="vw-gastos">
   <div class="pt">Gastos</div>
   <div class="ps">Control de gastos fijos y variables</div>
-  <div class="prox">
-    <div class="prox-ico">💰</div>
-    <div class="prox-t">Disponible en MVP 3</div>
-    <div class="prox-s">Aquí registrarás y analizarás todos los gastos del negocio.</div>
+
+  <!-- Stat cards -->
+  <div class="sc-grid">
+    <div class="sc acc"><div class="sc-label">Total del mes</div><div class="sc-val" id="gs-total">$0</div><div class="sc-sub">Fijos + Variables</div></div>
+    <div class="sc gn"><div class="sc-label">Gastos fijos</div><div class="sc-val" id="gs-fijos">$0</div><div class="sc-sub">Recurrentes</div></div>
+    <div class="sc am"><div class="sc-label">Gastos variables</div><div class="sc-val" id="gs-vars">$0</div><div class="sc-sub">Operativos</div></div>
+  </div>
+
+  <!-- Filtros -->
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+    <input class="inp" type="month" id="gasto-mes" onchange="cargarGastos()">
+    <select class="sel" id="gasto-tipo-filtro" onchange="cargarGastos()">
+      <option value="">Todos los tipos</option>
+      <option value="fijo">Solo fijos</option>
+      <option value="variable">Solo variables</option>
+    </select>
+    <button class="btn btn-p btn-sm" onclick="abrirModalGasto()" style="margin-left:auto;">+ Registrar gasto</button>
+  </div>
+
+  <div class="tw">
+    <div class="th2">
+      <span class="tt" id="gasto-count">Gastos</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="gastos-tbody"></tbody>
+    </table>
   </div>
 </div>
 
@@ -386,26 +404,80 @@ tr:hover td{background:#FAFAF8;}
     </div>
     <div class="mob">
       <input type="hidden" id="mp-id">
-      <div class="fld">
-        <label class="flbl">Nombre *</label>
-        <input class="finp" id="mp-nombre" placeholder="Ej. Cochinita pibil chica">
-      </div>
-      <div class="fld">
-        <label class="flbl">Categoría *</label>
-        <select class="finp" id="mp-cat"></select>
-      </div>
-      <div class="fld">
-        <label class="flbl">Precio (MXN) *</label>
-        <input class="finp" id="mp-precio" type="number" min="0" step="0.50" placeholder="0.00">
-      </div>
-      <div class="fld">
-        <label class="flbl">Descripción (opcional)</label>
-        <input class="finp" id="mp-desc" placeholder="Descripción breve del producto">
-      </div>
+      <div class="fld"><label class="flbl">Nombre *</label><input class="finp" id="mp-nombre" placeholder="Ej. Cochinita pibil chica"></div>
+      <div class="fld"><label class="flbl">Categoría *</label><select class="finp" id="mp-cat"></select></div>
+      <div class="fld"><label class="flbl">Precio (MXN) *</label><input class="finp" id="mp-precio" type="number" min="0" step="0.50" placeholder="0.00"></div>
+      <div class="fld"><label class="flbl">Descripción (opcional)</label><input class="finp" id="mp-desc" placeholder="Descripción breve del producto"></div>
     </div>
     <div class="mof">
       <button class="btn" onclick="cerrarModalProducto()">Cancelar</button>
       <button class="btn btn-p" onclick="guardarProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL GASTO ───────────────────────────────────── -->
+<div class="mov" id="mov-gasto">
+  <div class="mo">
+    <div class="moh">
+      <div class="mot" id="mg-title">Registrar gasto</div>
+      <button class="mox" onclick="cerrarModalGasto()">✕</button>
+    </div>
+    <div class="mob">
+      <input type="hidden" id="mg-id">
+      <div class="fld"><label class="flbl">Descripción *</label><input class="finp" id="mg-desc" placeholder="Ej. Compra de ingredientes"></div>
+      <div class="frow">
+        <div class="fld">
+          <label class="flbl">Tipo *</label>
+          <select class="finp" id="mg-tipo">
+            <option value="variable">Variable</option>
+            <option value="fijo">Fijo</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label class="flbl">Monto (MXN) *</label>
+          <input class="finp" id="mg-monto" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fld">
+          <label class="flbl">Categoría</label>
+          <select class="finp" id="mg-cat">
+            <option value="Ingredientes">Ingredientes / Insumos</option>
+            <option value="Nomina">Nómina</option>
+            <option value="Renta">Renta</option>
+            <option value="Servicios">Servicios (agua, luz, gas)</option>
+            <option value="Equipo">Equipo y mantenimiento</option>
+            <option value="Marketing">Marketing</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label class="flbl">Fecha *</label>
+          <input class="finp" id="mg-fecha" type="date">
+        </div>
+      </div>
+    </div>
+    <div class="mof">
+      <button class="btn" onclick="cerrarModalGasto()">Cancelar</button>
+      <button class="btn btn-p" onclick="guardarGasto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL CONFIRMACIÓN ────────────────────────────── -->
+<div class="mov" id="mov-confirm">
+  <div class="mo mo-sm">
+    <div class="moh">
+      <div class="mot">⚠️ Confirmar acción</div>
+      <button class="mox" onclick="cerrarConfirm()">✕</button>
+    </div>
+    <div class="mob">
+      <p id="confirm-msg" style="font-size:14px;line-height:1.6;"></p>
+    </div>
+    <div class="mof">
+      <button class="btn" onclick="cerrarConfirm()">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok-btn" onclick="ejecutarConfirm()">Confirmar</button>
     </div>
   </div>
 </div>
@@ -417,12 +489,28 @@ const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const sb = supabase.createClient(SURL, SKEY);
 
 // ── STATE ─────────────────────────────────────────────
-let SESSION    = null;
+let SESSION     = null;
 let realtimeSub = null;
+let confirmCallback = null;
 let DB = { categorias: [], productos: [] };
-let catFiltro     = null;
-let cajaCatFiltro = null;
-let PEDIDO = { canal: 'mesa', mesa: '', notas: '', items: [] };
+let catFiltro = null, cajaCatFiltro = null;
+let PEDIDO = { canal: 'mesa', mesa: '', items: [] };
+
+// ── CONFIRM MODAL ─────────────────────────────────────
+function abrirConfirm(msg, callback, btnLabel = 'Confirmar') {
+  confirmCallback = callback;
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-ok-btn').textContent = btnLabel;
+  document.getElementById('mov-confirm').classList.add('open');
+}
+function cerrarConfirm() {
+  document.getElementById('mov-confirm').classList.remove('open');
+  confirmCallback = null;
+}
+function ejecutarConfirm() {
+  if (confirmCallback) confirmCallback();
+  cerrarConfirm();
+}
 
 // ── AUTH ──────────────────────────────────────────────
 async function doLogin() {
@@ -490,10 +578,16 @@ async function initApp() {
     sv('cocina');
   }
 
+  // Mes actual en filtro de gastos
+  const hoy = new Date();
+  document.getElementById('gasto-mes').value =
+    hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+
   await cargarCategorias();
   await cargarProductos();
   await cargarHistorial();
   await cargarKDS();
+  await cargarGastos();
   iniciarRealtime();
 }
 
@@ -596,8 +690,7 @@ function renderOrden() {
   const cont = document.getElementById('order-items');
   if (!PEDIDO.items.length) {
     cont.innerHTML = '<div class="order-empty">Toca un producto para agregarlo</div>';
-    document.getElementById('order-total').textContent = '$0.00';
-    return;
+    document.getElementById('order-total').textContent = '$0.00'; return;
   }
   cont.innerHTML = PEDIDO.items.map(i => `
     <div class="order-item">
@@ -616,7 +709,6 @@ function renderOrden() {
 
 function limpiarPedido() {
   PEDIDO.items = [];
-  PEDIDO.notas = '';
   document.getElementById('order-notas').value = '';
   renderOrden();
 }
@@ -626,7 +718,6 @@ async function enviarPedido() {
   if (PEDIDO.canal === 'mesa' && !document.getElementById('inp-mesa').value.trim()) {
     toast('Ingresa el número de mesa', 'err'); return;
   }
-
   const total = PEDIDO.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const notas = document.getElementById('order-notas').value.trim();
   const mesa  = PEDIDO.canal === 'mesa' ? document.getElementById('inp-mesa').value.trim() : null;
@@ -634,16 +725,12 @@ async function enviarPedido() {
   const { data: pedido, error: errPed } = await sb.from('pedidos')
     .insert({ canal: PEDIDO.canal, mesa, estado: 'nuevo', notas: notas || null, total, creado_por: SESSION.id })
     .select().single();
-
   if (errPed) { toast('Error al crear pedido: ' + errPed.message, 'err'); return; }
 
   const detalle = PEDIDO.items.map(i => ({
-    pedido_id: pedido.id,
-    producto_id: i.producto_id,
-    cantidad: i.cantidad,
-    precio_unitario: i.precio
+    pedido_id: pedido.id, producto_id: i.producto_id,
+    cantidad: i.cantidad, precio_unitario: i.precio
   }));
-
   const { error: errDet } = await sb.from('detalle_pedido').insert(detalle);
   if (errDet) { toast('Error al guardar detalle: ' + errDet.message, 'err'); return; }
 
@@ -665,36 +752,76 @@ async function cargarHistorial() {
   const tbody = document.getElementById('hist-tbody');
   if (!tbody) return;
   const lista = data || [];
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin pedidos hoy</td></tr>'; return;
-  }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos hoy</td></tr>'; return; }
 
-  const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En preparación', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
-  const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
-  const canalLabel  = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
+  const estadoLabel  = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
+  const estadoBadge  = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
+  const canalLabel   = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
+  const pagoLabel    = { por_pagar:'Por pagar', pagado:'Pagado' };
+  const pagoBadge    = { por_pagar:'ba', pagado:'bg' };
 
-  tbody.innerHTML = lista.map(p => `
-    <tr>
-      <td class="precio">#${p.id}</td>
-      <td>${canalLabel[p.canal] || p.canal}</td>
-      <td>${p.mesa || '—'}</td>
-      <td><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado] || p.estado}</span></td>
-      <td class="precio">$${parseFloat(p.total).toFixed(2)}</td>
-      <td style="font-size:12px;color:var(--t2);">${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
-      <td>
-        ${p.estado === 'listo'
-          ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id})">Entregar</button>`
-          : p.estado === 'entregado' ? '<span style="color:var(--t3);font-size:12px;">✓ Entregado</span>' : '—'}
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = lista.map(p => {
+    const esAdmin = SESSION?.rol === 'admin';
+    const pagoCell = p.pago_estado
+      ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>
+         ${p.pago_estado === 'por_pagar' ? `<br><button class="btn btn-sm btn-gn" onclick="marcarPagado(${p.id})" style="margin-top:4px;">Cobrar</button>` : ''}`
+      : '—';
+
+    const accionEntrega = p.estado === 'listo'
+      ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id},'${p.canal}')">Entregar</button>`
+      : p.estado === 'entregado' || p.estado === 'cancelado'
+        ? `<span style="color:var(--t3);font-size:12px;">${p.estado === 'cancelado' ? '✕ Cancelado' : '✓ Entregado'}</span>`
+        : '—';
+
+    const accionAdmin = esAdmin && p.estado !== 'cancelado'
+      ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" style="margin-left:4px;">Cancelar</button>`
+      : '';
+
+    return `
+      <tr>
+        <td class="precio">#${p.id}</td>
+        <td>${canalLabel[p.canal] || p.canal}</td>
+        <td>${p.mesa || '—'}</td>
+        <td><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado] || p.estado}</span></td>
+        <td>${pagoCell}</td>
+        <td class="precio">$${parseFloat(p.total).toFixed(2)}</td>
+        <td style="font-size:12px;color:var(--t2);">${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
+        <td style="white-space:nowrap;">${accionEntrega}${accionAdmin}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
-async function marcarEntregado(id) {
-  const { error } = await sb.from('pedidos').update({ estado: 'entregado' }).eq('id', id);
+async function marcarEntregado(id, canal) {
+  const pagoEstado = canal === 'app' ? 'pagado' : 'por_pagar';
+  const { error } = await sb.from('pedidos')
+    .update({ estado: 'entregado', pago_estado: pagoEstado, updated_at: new Date().toISOString() })
+    .eq('id', id);
   if (error) { toast('Error: ' + error.message, 'err'); return; }
-  toast('Pedido entregado ✓', 'ok');
+  toast(canal === 'app' ? 'Entregado y pagado ✓' : 'Entregado — pendiente de cobro', 'ok');
   await cargarHistorial();
+}
+
+async function marcarPagado(id) {
+  const { error } = await sb.from('pedidos')
+    .update({ pago_estado: 'pagado' }).eq('id', id);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  toast('Pago registrado ✓', 'ok');
+  await cargarHistorial();
+}
+
+function cancelarPedido(id) {
+  abrirConfirm(
+    `¿Seguro que deseas cancelar el pedido #${id}? Esta acción no se puede deshacer.`,
+    async () => {
+      const { error } = await sb.from('pedidos')
+        .update({ estado: 'cancelado', updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      toast(`Pedido #${id} cancelado`, 'ok');
+      await cargarHistorial();
+    },
+    'Sí, cancelar'
+  );
 }
 
 // ── KDS — COCINA ──────────────────────────────────────
@@ -705,36 +832,31 @@ async function cargarKDS() {
     .order('created_at', { ascending: true });
 
   const lista = data || [];
-  const count = document.getElementById('kds-count');
-  if (count) count.textContent = lista.length + (lista.length === 1 ? ' pendiente' : ' pendientes');
+  const countEl = document.getElementById('kds-count');
+  if (countEl) countEl.textContent = lista.length + (lista.length === 1 ? ' pendiente' : ' pendientes');
 
   const grid = document.getElementById('kds-grid');
   if (!grid) return;
-
   if (!lista.length) {
     grid.innerHTML = `
       <div class="kds-empty" style="grid-column:1/-1;">
         <div style="font-size:32px;margin-bottom:10px;">✅</div>
         <div style="font-weight:600;margin-bottom:4px;">Sin pedidos pendientes</div>
         <div style="font-size:12px;color:var(--t2);">Los pedidos nuevos aparecerán aquí automáticamente</div>
-      </div>`;
-    return;
+      </div>`; return;
   }
 
   const canalLabel = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
-
   grid.innerHTML = lista.map(p => {
-    const mins = Math.floor((Date.now() - new Date(p.created_at)) / 60000);
+    const mins   = Math.floor((Date.now() - new Date(p.created_at)) / 60000);
     const tiempo = mins < 1 ? 'Ahora' : mins === 1 ? '1 min' : `${mins} min`;
-    const esNuevo = p.estado === 'nuevo';
+    const esNuevo  = p.estado === 'nuevo';
     const btnLabel = esNuevo ? '▶ Iniciar preparación' : '✓ Marcar listo';
     const btnClass = esNuevo ? 'btn btn-am' : 'btn btn-gn';
     const nextEst  = esNuevo ? 'en_preparacion' : 'listo';
-
-    const items = (p.detalle_pedido || []).map(d =>
+    const items    = (p.detalle_pedido || []).map(d =>
       `<div class="kds-item"><span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}</div>`
     ).join('');
-
     return `
       <div class="kds-card ${p.estado}">
         <div class="kds-card-head">
@@ -751,18 +873,136 @@ async function cargarKDS() {
             ${btnLabel}
           </button>
         </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
 async function avanzarEstado(id, nuevoEstado) {
-  const { error } = await sb.from('pedidos').update({ estado: nuevoEstado, updated_at: new Date().toISOString() }).eq('id', id);
+  const { error } = await sb.from('pedidos')
+    .update({ estado: nuevoEstado, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) { toast('Error: ' + error.message, 'err'); return; }
-  const msg = nuevoEstado === 'en_preparacion' ? 'Preparación iniciada' : 'Pedido listo ✓';
-  toast(msg, 'ok');
+  toast(nuevoEstado === 'en_preparacion' ? 'Preparación iniciada' : 'Pedido listo ✓', 'ok');
   await cargarKDS();
   await cargarHistorial();
+}
+
+// ── GASTOS ────────────────────────────────────────────
+async function cargarGastos() {
+  const mes  = document.getElementById('gasto-mes').value;
+  const tipo = document.getElementById('gasto-tipo-filtro').value;
+
+  if (!mes) return;
+  const [anio, m] = mes.split('-');
+  const inicio = `${anio}-${m}-01`;
+  const fin    = new Date(anio, parseInt(m), 0).toISOString().split('T')[0];
+
+  let q = sb.from('gastos').select('*')
+    .gte('fecha', inicio).lte('fecha', fin)
+    .eq('erased', false)
+    .order('fecha', { ascending: false });
+  if (tipo) q = q.eq('tipo', tipo);
+
+  const { data } = await q;
+  const lista = data || [];
+
+  // Stat cards (ignora filtro de tipo para los totales del mes)
+  const { data: todos } = await sb.from('gastos').select('monto,tipo')
+    .gte('fecha', inicio).lte('fecha', fin).eq('erased', false);
+  const t = todos || [];
+  const totalMes = t.reduce((s, g) => s + parseFloat(g.monto), 0);
+  const totalFij = t.filter(g => g.tipo === 'fijo').reduce((s, g) => s + parseFloat(g.monto), 0);
+  const totalVar = t.filter(g => g.tipo === 'variable').reduce((s, g) => s + parseFloat(g.monto), 0);
+  document.getElementById('gs-total').textContent = '$' + totalMes.toLocaleString('es-MX', {minimumFractionDigits:0});
+  document.getElementById('gs-fijos').textContent = '$' + totalFij.toLocaleString('es-MX', {minimumFractionDigits:0});
+  document.getElementById('gs-vars').textContent  = '$' + totalVar.toLocaleString('es-MX', {minimumFractionDigits:0});
+
+  document.getElementById('gasto-count').textContent = `${lista.length} registro${lista.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('gastos-tbody');
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Sin gastos registrados en este período</td></tr>'; return; }
+
+  const esAdmin = SESSION?.rol === 'admin';
+  tbody.innerHTML = lista.map(g => `
+    <tr>
+      <td><strong>${g.descripcion}</strong></td>
+      <td>${g.categoria || '—'}</td>
+      <td><span class="badge ${g.tipo === 'fijo' ? 'bpu' : 'ba'}">${g.tipo === 'fijo' ? 'Fijo' : 'Variable'}</span></td>
+      <td class="precio">$${parseFloat(g.monto).toFixed(2)}</td>
+      <td style="font-size:12px;">${g.fecha}</td>
+      <td style="white-space:nowrap;">
+        ${esAdmin ? `
+          <button class="btn btn-sm" onclick="abrirModalGasto(${g.id})">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="borrarGasto(${g.id},'${g.descripcion.replace(/'/g,"\\'")}') " style="margin-left:4px;">Borrar</button>
+        ` : '—'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function abrirModalGasto(id = null) {
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('mg-id').value   = '';
+  document.getElementById('mg-desc').value = '';
+  document.getElementById('mg-tipo').value = 'variable';
+  document.getElementById('mg-monto').value= '';
+  document.getElementById('mg-cat').value  = 'Ingredientes';
+  document.getElementById('mg-fecha').value= hoy;
+  document.getElementById('mg-title').textContent = 'Registrar gasto';
+
+  if (id) {
+    // cargar datos del gasto para editar
+    sb.from('gastos').select('*').eq('id', id).single().then(({ data }) => {
+      if (!data) return;
+      document.getElementById('mg-id').value    = data.id;
+      document.getElementById('mg-desc').value  = data.descripcion;
+      document.getElementById('mg-tipo').value  = data.tipo;
+      document.getElementById('mg-monto').value = data.monto;
+      document.getElementById('mg-cat').value   = data.categoria || 'Otro';
+      document.getElementById('mg-fecha').value = data.fecha;
+      document.getElementById('mg-title').textContent = 'Editar gasto';
+    });
+  }
+  document.getElementById('mov-gasto').classList.add('open');
+}
+
+function cerrarModalGasto() {
+  document.getElementById('mov-gasto').classList.remove('open');
+}
+
+async function guardarGasto() {
+  const id   = document.getElementById('mg-id').value;
+  const desc = document.getElementById('mg-desc').value.trim();
+  const tipo = document.getElementById('mg-tipo').value;
+  const monto= parseFloat(document.getElementById('mg-monto').value);
+  const cat  = document.getElementById('mg-cat').value;
+  const fecha= document.getElementById('mg-fecha').value;
+
+  if (!desc)           { toast('Ingresa la descripción', 'err'); return; }
+  if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'err'); return; }
+  if (!fecha)          { toast('Ingresa la fecha', 'err'); return; }
+
+  const payload = { descripcion: desc, tipo, monto, categoria: cat, fecha, registrado_por: SESSION.id };
+  let error;
+  if (id) { ({ error } = await sb.from('gastos').update(payload).eq('id', parseInt(id))); }
+  else    { ({ error } = await sb.from('gastos').insert({ ...payload, erased: false })); }
+
+  if (error) { toast('Error al guardar: ' + error.message, 'err'); return; }
+  cerrarModalGasto();
+  toast(id ? 'Gasto actualizado ✓' : 'Gasto registrado ✓', 'ok');
+  await cargarGastos();
+}
+
+function borrarGasto(id, desc) {
+  abrirConfirm(
+    `¿Seguro que deseas eliminar el gasto "${desc}"? El registro se borrará del historial.`,
+    async () => {
+      const { error } = await sb.from('gastos').update({ erased: true }).eq('id', id);
+      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      toast('Gasto eliminado', 'ok');
+      await cargarGastos();
+    },
+    'Sí, eliminar'
+  );
 }
 
 // ── MENÚ ──────────────────────────────────────────────
@@ -773,14 +1013,12 @@ function renderCatChips() {
     cont.innerHTML += `<button class="chip" onclick="filtrarCat(${c.id},this)">${c.nombre}</button>`;
   });
 }
-
 function filtrarCat(id, el) {
   catFiltro = id;
   document.querySelectorAll('#cat-chips .chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderProductos();
 }
-
 function renderProductos() {
   const q = (document.getElementById('menu-q')?.value || '').toLowerCase();
   let lista = DB.productos;
@@ -801,10 +1039,8 @@ function renderProductos() {
           ${p.activo ? 'Desactivar' : 'Activar'}
         </button>
       </td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 }
-
 function renderCatSelect() {
   const sel = document.getElementById('mp-cat');
   sel.innerHTML = DB.categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
@@ -821,11 +1057,9 @@ function abrirModalProducto(id = null) {
   document.getElementById('mp-desc').value   = p?.descripcion || '';
   document.getElementById('mov-producto').classList.add('open');
 }
-
 function cerrarModalProducto() {
   document.getElementById('mov-producto').classList.remove('open');
 }
-
 async function guardarProducto() {
   const id     = document.getElementById('mp-id').value;
   const nombre = document.getElementById('mp-nombre').value.trim();
@@ -843,7 +1077,6 @@ async function guardarProducto() {
   toast(id ? 'Producto actualizado ✓' : 'Producto agregado ✓', 'ok');
   await cargarProductos();
 }
-
 async function toggleActivo(id, activo) {
   const { error } = await sb.from('productos').update({ activo: !activo }).eq('id', id);
   if (error) { toast('Error al actualizar', 'err'); return; }
