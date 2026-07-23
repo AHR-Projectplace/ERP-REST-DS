@@ -8,6 +8,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ERP Restaurante</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -203,6 +204,28 @@ tr:hover td{background:#FAFAF8;}
 .kds-action{padding:10px 14px;}
 .kds-empty{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:56px;text-align:center;}
 .hist-section{margin-top:24px;}
+
+/* ── DASHBOARD ─────────────────────────────────────── */
+.dash-section{margin-bottom:28px;}
+.dash-section-title{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--t);display:flex;align-items:center;gap:8px;}
+.period-sel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
+.period-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--bd2);background:var(--surface);font-family:inherit;font-size:12px;cursor:pointer;color:var(--t2);transition:all .15s;}
+.period-btn:hover{border-color:var(--acc);color:var(--acc);}
+.period-btn.active{background:var(--acc);color:#fff;border-color:var(--acc);}
+.dash-sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px;margin-bottom:24px;}
+.hist-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bd);background:var(--bg);}
+.sc-trend{font-size:11px;margin-top:4px;font-weight:500;}
+.sc-trend.up{color:var(--gn);}
+.sc-trend.dn{color:var(--rd);}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+@media(max-width:800px){.charts-grid{grid-template-columns:1fr;}}
+.chart-box{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;}
+.top-item{margin-bottom:12px;}
+.top-item-label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;}
+.top-item-bar{background:var(--s2);border-radius:4px;height:6px;}
+.top-item-fill{background:var(--acc);border-radius:4px;height:6px;transition:width .4s;}
+.alerta-rd{background:var(--rd2);border:1px solid var(--rd);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;}
+.alerta-am{background:var(--am2);border:1px solid var(--am);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -239,7 +262,7 @@ tr:hover td{background:#FAFAF8;}
       <button class="ntb" id="nb-cocina"    onclick="sv('cocina')"    style="display:none;">🍳 Cocina</button>
       <button class="ntb" id="nb-menu"      onclick="sv('menu')"      style="display:none;">Menú</button>
       <button class="ntb" id="nb-gastos"    onclick="sv('gastos')"    style="display:none;">Gastos</button>
-      <button class="ntb" id="nb-dashboard" onclick="sv('dashboard')" style="display:none;">📊 Dashboard</button>
+      <button class="ntb" id="nb-dashboard" onclick="sv('dashboard');cargarDashboard()" style="display:none;">📊 Dashboard</button>
     </div>
   </div>
   <div class="nav-user">
@@ -382,14 +405,116 @@ tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
-<!-- ── DASHBOARD (MVP 4) ─────────────────────────────── -->
+<!-- ── DASHBOARD ──────────────────────────────────────── -->
 <div class="vw" id="vw-dashboard">
   <div class="pt">Dashboard</div>
-  <div class="ps">Análisis y tendencias de ventas</div>
-  <div class="prox">
-    <div class="prox-ico">📊</div>
-    <div class="prox-t">Disponible en MVP 4</div>
-    <div class="prox-s">Ventas, gastos, ticket promedio y tendencias del negocio en un solo lugar.</div>
+  <div class="ps">Indicadores de ventas e historial completo</div>
+
+  <!-- Selector de período -->
+  <div class="period-sel">
+    <button class="period-btn active" onclick="setPeriod('hoy',this)">Hoy</button>
+    <button class="period-btn" onclick="setPeriod('semana',this)">Esta semana</button>
+    <button class="period-btn" onclick="setPeriod('mes',this)">Este mes</button>
+    <button class="period-btn" onclick="setPeriod('custom',this)">Personalizado</button>
+    <div id="custom-dates" style="display:none;display:flex;gap:6px;align-items:center;">
+      <input class="inp" type="date" id="dash-desde" style="font-size:12px;">
+      <span style="color:var(--t3);font-size:12px;">a</span>
+      <input class="inp" type="date" id="dash-hasta" style="font-size:12px;">
+      <button class="btn btn-sm btn-p" onclick="cargarDashboard()">Aplicar</button>
+    </div>
+  </div>
+
+  <!-- Stat cards de ventas -->
+  <div class="dash-sc-grid">
+    <div class="sc acc">
+      <div class="sc-label">Ingresos</div>
+      <div class="sc-val" id="d-ingresos">$0</div>
+      <div class="sc-sub" id="d-ingresos-sub">del período</div>
+    </div>
+    <div class="sc gn">
+      <div class="sc-label">Total pedidos</div>
+      <div class="sc-val" id="d-pedidos">0</div>
+      <div class="sc-sub" id="d-pedidos-sub">órdenes</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Ticket promedio</div>
+      <div class="sc-val" id="d-ticket" style="color:var(--pu);">$0</div>
+      <div class="sc-sub">por pedido</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Canal top</div>
+      <div class="sc-val" id="d-canal" style="font-size:16px;color:var(--t);">—</div>
+      <div class="sc-sub" id="d-canal-sub">—</div>
+    </div>
+    <div class="sc am">
+      <div class="sc-label">Por cobrar</div>
+      <div class="sc-val" id="d-cobrar">$0</div>
+      <div class="sc-sub">pendientes de pago</div>
+    </div>
+  </div>
+
+  <!-- Gráficas: ventas por día + top productos -->
+  <div class="charts-grid">
+    <div class="dash-section">
+      <div class="dash-section-title">📈 Ventas por día</div>
+      <div class="chart-box">
+        <div id="chart-ventas-wrap" style="position:relative;min-height:180px;">
+          <canvas id="chart-ventas"></canvas>
+          <div id="chart-ventas-empty" class="empty" style="display:none;padding:40px;">Sin ventas en este período</div>
+        </div>
+      </div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">🏆 Top 5 productos</div>
+      <div class="chart-box" style="min-height:212px;">
+        <div id="top-productos-wrap"><div class="empty" style="padding:32px;">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Análisis de gastos -->
+  <div class="dash-section" style="margin-bottom:24px;">
+    <div class="dash-section-title">💰 Análisis de gastos</div>
+    <div class="chart-box">
+      <div id="gastos-analytics"><div class="empty" style="padding:24px;">Cargando...</div></div>
+    </div>
+  </div>
+
+  <!-- Historial completo -->
+  <div class="dash-section">
+    <div class="dash-section-title">🧾 Historial completo de pedidos</div>
+    <div class="tw">
+      <div class="hist-filters">
+        <select class="sel" id="hf-canal" onchange="renderHistorialCompleto()" style="font-size:12px;">
+          <option value="">Todos los canales</option>
+          <option value="mesa">Mesa</option>
+          <option value="llevar">Para llevar</option>
+          <option value="app">App</option>
+        </select>
+        <select class="sel" id="hf-estado" onchange="renderHistorialCompleto()" style="font-size:12px;">
+          <option value="">Todos los estados</option>
+          <option value="nuevo">Nuevo</option>
+          <option value="en_preparacion">En preparación</option>
+          <option value="listo">Listo</option>
+          <option value="entregado">Entregado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        <select class="sel" id="hf-pago" onchange="renderHistorialCompleto()" style="font-size:12px;">
+          <option value="">Todos los pagos</option>
+          <option value="por_pagar">Por cobrar</option>
+          <option value="pagado">Pagado</option>
+        </select>
+        <span class="tt" id="d-hist-count" style="margin-left:auto;font-size:12px;color:var(--t2);"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Fecha</th><th>Hora</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Pago</th><th>Total</th></tr>
+          </thead>
+          <tbody id="dash-hist-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -588,6 +713,7 @@ async function initApp() {
   await cargarHistorial();
   await cargarKDS();
   await cargarGastos();
+  if (SESSION.rol === 'admin') await cargarDashboard();
   iniciarRealtime();
 }
 
@@ -1082,6 +1208,340 @@ async function toggleActivo(id, activo) {
   if (error) { toast('Error al actualizar', 'err'); return; }
   toast(activo ? 'Producto desactivado' : 'Producto activado ✓', 'ok');
   await cargarProductos();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────
+let DASH_PERIOD   = 'hoy';
+let DASH_DATA     = [];
+let DASH_DETALLES = [];
+let DASH_GASTOS   = [];
+let DASH_PREV_ING = 0;
+let chartVentas   = null;
+
+function setPeriod(period, el) {
+  DASH_PERIOD = period;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const customDiv = document.getElementById('custom-dates');
+  if (customDiv) customDiv.style.display = period === 'custom' ? 'flex' : 'none';
+  if (period !== 'custom') cargarDashboard();
+}
+
+function getPeriodRange() {
+  const hoy   = new Date();
+  const pad   = n => String(n).padStart(2,'0');
+  const fmt   = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  if (DASH_PERIOD === 'hoy') {
+    const s = fmt(hoy);
+    return { desde: s + 'T00:00:00', hasta: s + 'T23:59:59' };
+  }
+  if (DASH_PERIOD === 'semana') {
+    const dow   = hoy.getDay();
+    const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((dow + 6) % 7));
+    const dom   = new Date(lunes); dom.setDate(lunes.getDate() + 6);
+    return { desde: fmt(lunes) + 'T00:00:00', hasta: fmt(dom) + 'T23:59:59' };
+  }
+  if (DASH_PERIOD === 'mes') {
+    const s = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-01T00:00:00`;
+    const lastDay = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0);
+    return { desde: s, hasta: fmt(lastDay) + 'T23:59:59' };
+  }
+  if (DASH_PERIOD === 'custom') {
+    const desde = document.getElementById('dash-desde')?.value;
+    const hasta = document.getElementById('dash-hasta')?.value;
+    if (!desde || !hasta) return null;
+    return { desde: desde + 'T00:00:00', hasta: hasta + 'T23:59:59' };
+  }
+  return null;
+}
+
+async function cargarDashboard() {
+  const range = getPeriodRange();
+  if (!range) return;
+
+  // 1. Pedidos del período
+  const { data: pedidos } = await sb.from('pedidos')
+    .select('*')
+    .gte('created_at', range.desde)
+    .lte('created_at', range.hasta)
+    .order('created_at', { ascending: false });
+  DASH_DATA = pedidos || [];
+
+  // 2. Detalle de pedidos activos (para top productos)
+  const ids = DASH_DATA.filter(p => p.estado !== 'cancelado').map(p => p.id);
+  if (ids.length > 0) {
+    const { data: det } = await sb.from('detalle_pedido')
+      .select('cantidad, precio_unitario, producto_id, productos(nombre)')
+      .in('pedido_id', ids);
+    DASH_DETALLES = det || [];
+  } else { DASH_DETALLES = []; }
+
+  // 3. Gastos del período
+  const fDesde = range.desde.split('T')[0];
+  const fHasta = range.hasta.split('T')[0];
+  const { data: gastos } = await sb.from('gastos')
+    .select('*').gte('fecha', fDesde).lte('fecha', fHasta).eq('erased', false);
+  DASH_GASTOS = gastos || [];
+
+  // 4. Ingresos período anterior (para comparativo)
+  const prev = getPrevPeriodRange(range);
+  if (prev) {
+    const { data: prevPed } = await sb.from('pedidos')
+      .select('total, estado')
+      .gte('created_at', prev.desde)
+      .lte('created_at', prev.hasta);
+    DASH_PREV_ING = (prevPed || [])
+      .filter(p => p.estado !== 'cancelado')
+      .reduce((s, p) => s + parseFloat(p.total || 0), 0);
+  } else { DASH_PREV_ING = 0; }
+
+  calcularIndicadores();
+  renderGraficaVentas();
+  renderTopProductos();
+  renderAnalisisGastos();
+  renderHistorialCompleto();
+}
+
+function calcularIndicadores() {
+  const activos  = DASH_DATA.filter(p => p.estado !== 'cancelado');
+  const ingresos = activos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
+  const total    = activos.length;
+  const ticket   = total > 0 ? ingresos / total : 0;
+  const porCobrar= activos
+    .filter(p => p.pago_estado === 'por_pagar')
+    .reduce((s, p) => s + parseFloat(p.total || 0), 0);
+
+  // Canal top
+  const canales = { mesa: 0, llevar: 0, app: 0 };
+  activos.forEach(p => { if (canales[p.canal] !== undefined) canales[p.canal]++; });
+  const canalTop = Object.entries(canales).sort((a,b) => b[1]-a[1])[0];
+  const canalLabel = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
+
+  document.getElementById('d-ingresos').textContent  = '$' + ingresos.toLocaleString('es-MX',{minimumFractionDigits:0});
+  document.getElementById('d-pedidos').textContent   = total;
+  document.getElementById('d-ticket').textContent    = '$' + ticket.toFixed(2);
+  document.getElementById('d-cobrar').textContent    = '$' + porCobrar.toLocaleString('es-MX',{minimumFractionDigits:0});
+  document.getElementById('d-canal').textContent     = canalTop ? canalLabel[canalTop[0]] : '—';
+  document.getElementById('d-canal-sub').textContent = canalTop ? `${canalTop[1]} pedidos` : '—';
+
+  // Comparativo ingresos vs período anterior
+  const subEl = document.getElementById('d-ingresos-sub');
+  if (subEl && DASH_PREV_ING > 0) {
+    const diff = ((ingresos - DASH_PREV_ING) / DASH_PREV_ING) * 100;
+    const dir  = diff >= 0 ? '↑' : '↓';
+    const col  = diff >= 0 ? 'var(--gn)' : 'var(--rd)';
+    subEl.innerHTML = `<span style="color:${col};font-weight:600;">${dir} ${Math.abs(diff).toFixed(1)}%</span> vs anterior`;
+  } else if (subEl) { subEl.textContent = 'del período'; }
+}
+
+function renderHistorialCompleto() {
+  const canalF  = document.getElementById('hf-canal')?.value  || '';
+  const estadoF = document.getElementById('hf-estado')?.value || '';
+  const pagoF   = document.getElementById('hf-pago')?.value   || '';
+
+  let lista = [...DASH_DATA];
+  if (canalF)  lista = lista.filter(p => p.canal === canalF);
+  if (estadoF) lista = lista.filter(p => p.estado === estadoF);
+  if (pagoF)   lista = lista.filter(p => p.pago_estado === pagoF);
+
+  const countEl = document.getElementById('d-hist-count');
+  if (countEl) countEl.textContent = `${lista.length} registro${lista.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('dash-hist-tbody');
+  if (!tbody) return;
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos en este período</td></tr>'; return; }
+
+  const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
+  const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
+  const canalLabel  = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
+  const pagoLabel   = { por_pagar:'Por cobrar', pagado:'Pagado' };
+  const pagoBadge   = { por_pagar:'ba', pagado:'bg' };
+
+  tbody.innerHTML = lista.map(p => {
+    const fecha = new Date(p.created_at);
+    return `
+      <tr>
+        <td class="precio">#${p.id}</td>
+        <td style="font-size:12px;">${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'})}</td>
+        <td style="font-size:12px;color:var(--t2);">${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
+        <td>${canalLabel[p.canal] || p.canal}</td>
+        <td>${p.mesa || '—'}</td>
+        <td><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado] || p.estado}</span></td>
+        <td>${p.pago_estado ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>` : '—'}</td>
+        <td class="precio">$${parseFloat(p.total||0).toFixed(2)}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ── DASHBOARD — FUNCIONES ANALÍTICAS ─────────────────
+
+function getPrevPeriodRange(range) {
+  const desde = new Date(range.desde);
+  const hasta = new Date(range.hasta);
+  const durMs  = hasta.getTime() - desde.getTime();
+  const pHasta = new Date(desde.getTime() - 1000);
+  const pDesde = new Date(pHasta.getTime() - durMs);
+  const fmt    = d => d.toISOString().slice(0,19);
+  return { desde: fmt(pDesde), hasta: fmt(pHasta) };
+}
+
+function calcularDiasPeriodo() {
+  const range = getPeriodRange();
+  if (!range) return 1;
+  const ms = new Date(range.hasta) - new Date(range.desde);
+  return Math.max(1, Math.ceil(ms / 86400000));
+}
+
+function renderGraficaVentas() {
+  const canvas  = document.getElementById('chart-ventas');
+  const emptyEl = document.getElementById('chart-ventas-empty');
+  if (!canvas) return;
+
+  const activos = DASH_DATA.filter(p => p.estado !== 'cancelado');
+  const byDate  = {};
+  activos.forEach(p => {
+    const d = new Date(p.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'});
+    byDate[d] = (byDate[d] || 0) + parseFloat(p.total || 0);
+  });
+
+  const labels = Object.keys(byDate).reverse();
+  const values = labels.map(l => byDate[l]);
+
+  if (chartVentas) { chartVentas.destroy(); chartVentas = null; }
+
+  if (!labels.length) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  chartVentas = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Ventas',
+        data: values,
+        backgroundColor: 'rgba(192,82,26,.7)',
+        borderColor: '#C0521A',
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString('es-MX') } },
+        x: { ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderTopProductos() {
+  const cont = document.getElementById('top-productos-wrap');
+  if (!cont) return;
+  if (!DASH_DETALLES.length) {
+    cont.innerHTML = '<div class="empty" style="padding:32px;">Sin datos en este período</div>'; return;
+  }
+  const map = {};
+  DASH_DETALLES.forEach(d => {
+    const n = d.productos?.nombre || 'Desconocido';
+    if (!map[n]) map[n] = { cantidad: 0, total: 0 };
+    map[n].cantidad += d.cantidad;
+    map[n].total    += d.cantidad * parseFloat(d.precio_unitario || 0);
+  });
+  const top5   = Object.entries(map).sort((a,b) => b[1].cantidad - a[1].cantidad).slice(0,5);
+  const maxCant = top5[0]?.[1].cantidad || 1;
+  const medals  = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+  cont.innerHTML = top5.map(([nombre, d], i) => {
+    const pct = Math.round((d.cantidad / maxCant) * 100);
+    return `
+      <div class="top-item">
+        <div class="top-item-label">
+          <span>${medals[i]} ${nombre}</span>
+          <span style="font-family:'DM Mono',monospace;color:var(--t2);font-size:11px;">${d.cantidad} uds · $${d.total.toFixed(0)}</span>
+        </div>
+        <div class="top-item-bar"><div class="top-item-fill" style="width:${pct}%;"></div></div>
+      </div>`;
+  }).join('');
+}
+
+function renderAnalisisGastos() {
+  const cont = document.getElementById('gastos-analytics');
+  if (!cont) return;
+
+  const totalGastos = DASH_GASTOS.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+  const activos     = DASH_DATA.filter(p => p.estado !== 'cancelado');
+  const ingresos    = activos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
+  const ratio       = ingresos > 0 ? (totalGastos / ingresos) * 100 : 0;
+  const dias        = calcularDiasPeriodo();
+  const gastoDiario = totalGastos / dias;
+  const utilidad    = Math.max(0, ingresos - totalGastos);
+
+  // Alerta punto de equilibrio
+  let alertaHTML = '';
+  if (ratio > 80) {
+    alertaHTML = `<div class="alerta-rd">⚠️ <strong>Alerta:</strong> Los gastos representan el <strong>${ratio.toFixed(1)}%</strong> de los ingresos. Revisar costos operativos urgente.</div>`;
+  } else if (ratio > 60) {
+    alertaHTML = `<div class="alerta-am">💡 Los gastos son el <strong>${ratio.toFixed(1)}%</strong> de los ingresos. Margen aceptable, mantener monitoreo.</div>`;
+  }
+
+  // Top 3 categorías de gasto
+  const byCat = {};
+  DASH_GASTOS.forEach(g => {
+    const c = g.categoria || 'Otro';
+    byCat[c] = (byCat[c] || 0) + parseFloat(g.monto || 0);
+  });
+  const top3    = Object.entries(byCat).sort((a,b) => b[1]-a[1]).slice(0,3);
+  const maxCat  = top3[0]?.[1] || 1;
+  const catHTML = top3.length ? top3.map(([cat, monto]) => {
+    const pct  = totalGastos > 0 ? Math.round((monto / totalGastos) * 100) : 0;
+    const barW = Math.round((monto / maxCat) * 100);
+    return `
+      <div class="top-item">
+        <div class="top-item-label">
+          <span>${cat}</span>
+          <span style="font-family:'DM Mono',monospace;color:var(--t2);font-size:11px;">$${monto.toFixed(0)} (${pct}%)</span>
+        </div>
+        <div class="top-item-bar"><div class="top-item-fill" style="width:${barW}%;background:var(--am);"></div></div>
+      </div>`;
+  }).join('')
+  : '<div style="font-size:12px;color:var(--t3);">Sin gastos registrados en este período</div>';
+
+  const ratioColor = ratio > 80 ? 'var(--rd)' : ratio > 60 ? 'var(--am)' : 'var(--gn)';
+
+  cont.innerHTML = `
+    ${alertaHTML}
+    <div class="dash-sc-grid" style="margin-bottom:20px;">
+      <div class="sc">
+        <div class="sc-label">Total gastos</div>
+        <div class="sc-val" style="color:var(--rd);">$${totalGastos.toLocaleString('es-MX',{minimumFractionDigits:0})}</div>
+        <div class="sc-sub">del período</div>
+      </div>
+      <div class="sc">
+        <div class="sc-label">Ratio gasto/ingreso</div>
+        <div class="sc-val" style="color:${ratioColor};">${ratio.toFixed(1)}%</div>
+        <div class="sc-sub">de los ingresos</div>
+      </div>
+      <div class="sc">
+        <div class="sc-label">Gasto diario prom.</div>
+        <div class="sc-val" style="color:var(--am);">$${gastoDiario.toLocaleString('es-MX',{minimumFractionDigits:0})}</div>
+        <div class="sc-sub">por día</div>
+      </div>
+      <div class="sc gn">
+        <div class="sc-label">Utilidad estimada</div>
+        <div class="sc-val">$${utilidad.toLocaleString('es-MX',{minimumFractionDigits:0})}</div>
+        <div class="sc-sub">ingresos − gastos</div>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Top categorías de gasto</div>
+    ${catHTML}
+  `;
 }
 
 // ── TOAST ─────────────────────────────────────────────
