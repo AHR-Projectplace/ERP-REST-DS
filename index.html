@@ -226,6 +226,24 @@ tr:hover td{background:#FAFAF8;}
 .top-item-fill{background:var(--acc);border-radius:4px;height:6px;transition:width .4s;}
 .alerta-rd{background:var(--rd2);border:1px solid var(--rd);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;}
 .alerta-am{background:var(--am2);border:1px solid var(--am);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;}
+
+/* ── COMENSALES ────────────────────────────────────── */
+.comensales-grid{display:flex;gap:6px;flex-wrap:wrap;}
+.com-btn{width:44px;height:44px;border-radius:8px;border:2px solid var(--bd2);background:var(--surface);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;}
+.com-btn:hover{border-color:var(--acc);color:var(--acc);}
+.com-btn.active{border-color:var(--acc);background:var(--acc);color:#fff;}
+
+/* ── SUBCATEGORÍAS ─────────────────────────────────── */
+.subcat-row{margin-top:-6px;margin-bottom:10px;}
+.chip-sub{padding:4px 10px;border-radius:20px;border:1px solid var(--bd2);background:var(--surface);font-size:11px;cursor:pointer;color:var(--t2);transition:all .15s;font-family:inherit;}
+.chip-sub.active{background:var(--t);color:#fff;border-color:var(--t);}
+
+/* ── DETALLE ACCORDION ─────────────────────────────── */
+.detail-row{display:none;background:var(--bg);}
+.detail-row.open{display:table-row;}
+.detail-cell{padding:10px 16px 10px 32px;font-size:12px;color:var(--t2);}
+.detail-items{display:flex;gap:8px;flex-wrap:wrap;}
+.detail-tag{background:var(--surface);border:1px solid var(--bd);border-radius:6px;padding:3px 8px;font-size:11px;}
 </style>
 </head>
 <body>
@@ -286,13 +304,22 @@ tr:hover td{background:#FAFAF8;}
           <button class="canal-btn" onclick="setCanal('app',this)">📱 App</button>
         </div>
         <div id="mesa-wrap">
-          <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Número de mesa</label>
-          <input class="inp" id="inp-mesa" placeholder="Ej. 3" style="width:120px;" oninput="actualizarMesa()">
+          <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
+            <div>
+              <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Número de mesa</label>
+              <input class="inp" id="inp-mesa" placeholder="Ej. 3" style="width:100px;" oninput="actualizarMesa()">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Comensales</label>
+              <div class="comensales-grid" id="comensales-grid"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="fr" id="caj-cat-chips">
         <button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>
       </div>
+      <div class="subcat-row" id="caj-subcat-chips" style="display:none;"></div>
       <div class="prod-grid" id="prod-grid"></div>
     </div>
     <div class="order-panel">
@@ -357,12 +384,13 @@ tr:hover td{background:#FAFAF8;}
       <span class="tt" id="menu-count">Productos</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <input class="inp" placeholder="Buscar producto..." oninput="renderProductos()" id="menu-q" style="width:190px;">
+        <button class="btn btn-sm" id="btn-gestionar-subcat" onclick="abrirModalGestionSubcat()" style="display:none;">Subcategorías</button>
         <button class="btn btn-p btn-sm" onclick="abrirModalProducto()">+ Agregar</button>
       </div>
     </div>
     <table>
       <thead>
-        <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>
+        <tr><th>Producto</th><th>Categoría</th><th>Subcategoría</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>
       </thead>
       <tbody id="menu-tbody"></tbody>
     </table>
@@ -509,7 +537,7 @@ tr:hover td{background:#FAFAF8;}
       <div style="overflow-x:auto;">
         <table>
           <thead>
-            <tr><th>#</th><th>Fecha</th><th>Hora</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Pago</th><th>Total</th></tr>
+            <tr><th>#</th><th>Fecha</th><th>Hora</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Pago</th><th>Total</th><th></th></tr>
           </thead>
           <tbody id="dash-hist-tbody"></tbody>
         </table>
@@ -519,6 +547,31 @@ tr:hover td{background:#FAFAF8;}
 </div>
 
 </div><!-- /app -->
+
+<!-- ── MODAL SUBCATEGORÍAS ───────────────────────────── -->
+<div class="mov" id="mov-subcat-gestion">
+  <div class="mo">
+    <div class="moh">
+      <div class="mot">Gestionar subcategorías</div>
+      <button class="mox" onclick="document.getElementById('mov-subcat-gestion').classList.remove('open')">✕</button>
+    </div>
+    <div class="mob">
+      <div class="fld" style="display:flex;gap:8px;">
+        <select class="finp" id="sg-cat" style="flex:1;" onchange="renderSubcatLista()">
+          <option value="">Selecciona categoría...</option>
+        </select>
+      </div>
+      <div id="subcat-lista" style="margin-bottom:16px;"></div>
+      <div style="border-top:1px solid var(--bd);padding-top:14px;">
+        <div style="font-size:12px;font-weight:500;color:var(--t2);margin-bottom:8px;">Agregar subcategoría</div>
+        <div style="display:flex;gap:8px;">
+          <input class="finp" id="sg-nombre" placeholder="Nombre (ej. Cochinita, Birria)" style="flex:1;">
+          <button class="btn btn-p" onclick="guardarSubcat()">+ Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ── MODAL PRODUCTO ────────────────────────────────── -->
 <div class="mov" id="mov-producto">
@@ -530,7 +583,8 @@ tr:hover td{background:#FAFAF8;}
     <div class="mob">
       <input type="hidden" id="mp-id">
       <div class="fld"><label class="flbl">Nombre *</label><input class="finp" id="mp-nombre" placeholder="Ej. Cochinita pibil chica"></div>
-      <div class="fld"><label class="flbl">Categoría *</label><select class="finp" id="mp-cat"></select></div>
+      <div class="fld"><label class="flbl">Categoría *</label><select class="finp" id="mp-cat" onchange="actualizarSubcatSelect()"></select></div>
+      <div class="fld"><label class="flbl">Subcategoría (opcional)</label><select class="finp" id="mp-subcat"><option value="">Sin subcategoría</option></select></div>
       <div class="fld"><label class="flbl">Precio (MXN) *</label><input class="finp" id="mp-precio" type="number" min="0" step="0.50" placeholder="0.00"></div>
       <div class="fld"><label class="flbl">Descripción (opcional)</label><input class="finp" id="mp-desc" placeholder="Descripción breve del producto"></div>
     </div>
@@ -617,9 +671,11 @@ const sb = supabase.createClient(SURL, SKEY);
 let SESSION     = null;
 let realtimeSub = null;
 let confirmCallback = null;
-let DB = { categorias: [], productos: [] };
-let catFiltro = null, cajaCatFiltro = null;
+let DB = { categorias: [], productos: [], subcategorias: [] };
+let catFiltro = null, cajaCatFiltro = null, cajSubCatFiltro = null;
 let PEDIDO = { canal: 'mesa', mesa: '', items: [] };
+let comensalesActual = 1;
+let detalleByPedido  = {};
 
 // ── CONFIRM MODAL ─────────────────────────────────────
 function abrirConfirm(msg, callback, btnLabel = 'Confirmar') {
@@ -714,6 +770,7 @@ async function initApp() {
   await cargarKDS();
   await cargarGastos();
   if (SESSION.rol === 'admin') await cargarDashboard();
+  renderComensalesGrid();
   iniciarRealtime();
 }
 
@@ -731,9 +788,20 @@ function sv(view) {
 async function cargarCategorias() {
   const { data } = await sb.from('categorias').select('*').order('orden');
   DB.categorias = data || [];
+  const { data: subs } = await sb.from('subcategorias').select('*').order('orden');
+  DB.subcategorias = subs || [];
   renderCatChips();
   renderCatSelect();
   renderCajaCatChips();
+  // Poblar select de gestión de subcategorías
+  const sgCat = document.getElementById('sg-cat');
+  if (sgCat) {
+    sgCat.innerHTML = '<option value="">Selecciona categoría...</option>' +
+      DB.categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  }
+  // Mostrar botón subcategorías solo a admin
+  const btnSub = document.getElementById('btn-gestionar-subcat');
+  if (btnSub && SESSION?.rol === 'admin') btnSub.style.display = '';
 }
 
 async function cargarProductos() {
@@ -759,8 +827,10 @@ function setCanal(canal, el) {
   PEDIDO.canal = canal;
   document.querySelectorAll('.canal-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('mesa-wrap').style.display = canal === 'mesa' ? 'block' : 'none';
-  if (canal !== 'mesa') PEDIDO.mesa = '';
+  const mesaWrap = document.getElementById('mesa-wrap');
+  if (mesaWrap) mesaWrap.style.display = canal === 'mesa' ? 'block' : 'none';
+  if (canal !== 'mesa') { PEDIDO.mesa = ''; comensalesActual = 1; }
+  if (canal === 'mesa') renderComensalesGrid();
 }
 
 function actualizarMesa() {
@@ -769,6 +839,7 @@ function actualizarMesa() {
 
 function renderCajaCatChips() {
   const cont = document.getElementById('caj-cat-chips');
+  if (!cont) return;
   cont.innerHTML = '<button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>';
   DB.categorias.forEach(c => {
     cont.innerHTML += `<button class="chip" onclick="filtrarCajaCat(${c.id},this)">${c.nombre}</button>`;
@@ -776,15 +847,40 @@ function renderCajaCatChips() {
 }
 
 function filtrarCajaCat(id, el) {
-  cajaCatFiltro = id;
+  cajaCatFiltro  = id;
+  cajSubCatFiltro = null;
   document.querySelectorAll('#caj-cat-chips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  // Mostrar subcategorías de la categoría seleccionada
+  const subcatRow = document.getElementById('caj-subcat-chips');
+  if (id) {
+    const subs = DB.subcategorias.filter(s => s.categoria_id === id);
+    if (subs.length) {
+      subcatRow.style.display = 'flex';
+      subcatRow.innerHTML = '<button class="chip-sub active" onclick="filtrarCajaSubCat(null,this)">Todas</button>' +
+        subs.map(s => `<button class="chip-sub" onclick="filtrarCajaSubCat(${s.id},this)">${s.nombre}</button>`).join('');
+    } else {
+      subcatRow.style.display = 'none';
+      subcatRow.innerHTML = '';
+    }
+  } else {
+    subcatRow.style.display = 'none';
+    subcatRow.innerHTML = '';
+  }
+  renderProdGrid();
+}
+
+function filtrarCajaSubCat(id, el) {
+  cajSubCatFiltro = id;
+  document.querySelectorAll('#caj-subcat-chips .chip-sub').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderProdGrid();
 }
 
 function renderProdGrid() {
   let lista = DB.productos.filter(p => p.activo);
-  if (cajaCatFiltro) lista = lista.filter(p => p.categoria_id === cajaCatFiltro);
+  if (cajaCatFiltro)  lista = lista.filter(p => p.categoria_id === cajaCatFiltro);
+  if (cajSubCatFiltro) lista = lista.filter(p => p.subcategoria_id === cajSubCatFiltro);
   const grid = document.getElementById('prod-grid');
   if (!lista.length) { grid.innerHTML = '<div class="empty">Sin productos en esta categoría</div>'; return; }
   grid.innerHTML = lista.map(p => `
@@ -849,7 +945,9 @@ async function enviarPedido() {
   const mesa  = PEDIDO.canal === 'mesa' ? document.getElementById('inp-mesa').value.trim() : null;
 
   const { data: pedido, error: errPed } = await sb.from('pedidos')
-    .insert({ canal: PEDIDO.canal, mesa, estado: 'nuevo', notas: notas || null, total, creado_por: SESSION.id })
+    .insert({ canal: PEDIDO.canal, mesa, estado: 'nuevo', notas: notas || null, total,
+              creado_por: SESSION.id,
+              comensales: PEDIDO.canal === 'mesa' ? comensalesActual : null })
     .select().single();
   if (errPed) { toast('Error al crear pedido: ' + errPed.message, 'err'); return; }
 
@@ -1153,10 +1251,13 @@ function renderProductos() {
   document.getElementById('menu-count').textContent = `${lista.length} producto${lista.length !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('menu-tbody');
   if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin productos en esta categoría</td></tr>'; return; }
-  tbody.innerHTML = lista.map(p => `
+  tbody.innerHTML = lista.map(p => {
+    const subcat = DB.subcategorias.find(s => s.id === p.subcategoria_id);
+    return `
     <tr>
       <td><strong>${p.nombre}</strong>${p.descripcion ? `<br><span style="font-size:11px;color:var(--t3);">${p.descripcion}</span>` : ''}</td>
       <td>${p.categorias?.nombre || '—'}</td>
+      <td>${subcat ? `<span class="badge bgr">${subcat.nombre}</span>` : '—'}</td>
       <td class="precio">$${parseFloat(p.precio).toFixed(2)}</td>
       <td><span class="badge ${p.activo ? 'bg' : 'br'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
       <td style="white-space:nowrap;">
@@ -1165,11 +1266,21 @@ function renderProductos() {
           ${p.activo ? 'Desactivar' : 'Activar'}
         </button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 function renderCatSelect() {
   const sel = document.getElementById('mp-cat');
-  sel.innerHTML = DB.categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  if (sel) sel.innerHTML = DB.categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+}
+
+function actualizarSubcatSelect(catId = null) {
+  const catVal = catId || parseInt(document.getElementById('mp-cat')?.value);
+  const sel    = document.getElementById('mp-subcat');
+  if (!sel) return;
+  const subs = DB.subcategorias.filter(s => s.categoria_id === catVal);
+  sel.innerHTML = '<option value="">Sin subcategoría</option>' +
+    subs.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
 }
 
 // ── MODAL PRODUCTO ────────────────────────────────────
@@ -1181,20 +1292,23 @@ function abrirModalProducto(id = null) {
   document.getElementById('mp-cat').value    = p?.categoria_id || DB.categorias[0]?.id || '';
   document.getElementById('mp-precio').value = p?.precio || '';
   document.getElementById('mp-desc').value   = p?.descripcion || '';
+  actualizarSubcatSelect(p?.categoria_id || DB.categorias[0]?.id);
+  if (p?.subcategoria_id) document.getElementById('mp-subcat').value = p.subcategoria_id;
   document.getElementById('mov-producto').classList.add('open');
 }
 function cerrarModalProducto() {
   document.getElementById('mov-producto').classList.remove('open');
 }
 async function guardarProducto() {
-  const id     = document.getElementById('mp-id').value;
-  const nombre = document.getElementById('mp-nombre').value.trim();
-  const cat    = parseInt(document.getElementById('mp-cat').value);
-  const precio = parseFloat(document.getElementById('mp-precio').value);
-  const desc   = document.getElementById('mp-desc').value.trim();
+  const id      = document.getElementById('mp-id').value;
+  const nombre  = document.getElementById('mp-nombre').value.trim();
+  const cat     = parseInt(document.getElementById('mp-cat').value);
+  const subcat  = parseInt(document.getElementById('mp-subcat').value) || null;
+  const precio  = parseFloat(document.getElementById('mp-precio').value);
+  const desc    = document.getElementById('mp-desc').value.trim();
   if (!nombre)          { toast('Ingresa el nombre del producto', 'err'); return; }
   if (!precio || precio <= 0) { toast('Ingresa un precio válido', 'err'); return; }
-  const payload = { nombre, categoria_id: cat, precio, descripcion: desc || null };
+  const payload = { nombre, categoria_id: cat, subcategoria_id: subcat, precio, descripcion: desc || null };
   let error;
   if (id) { ({ error } = await sb.from('productos').update(payload).eq('id', parseInt(id))); }
   else    { ({ error } = await sb.from('productos').insert(payload)); }
@@ -1276,6 +1390,12 @@ async function cargarDashboard() {
       .in('pedido_id', ids);
     DASH_DETALLES = det || [];
   } else { DASH_DETALLES = []; }
+  // Construir mapa para accordion del historial
+  detalleByPedido = {};
+  DASH_DETALLES.forEach(d => {
+    if (!detalleByPedido[d.pedido_id]) detalleByPedido[d.pedido_id] = [];
+    detalleByPedido[d.pedido_id].push(d);
+  });
 
   // 3. Gastos del período
   const fDesde = range.desde.split('T')[0];
@@ -1350,7 +1470,7 @@ function renderHistorialCompleto() {
 
   const tbody = document.getElementById('dash-hist-tbody');
   if (!tbody) return;
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos en este período</td></tr>'; return; }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="9" class="empty">Sin pedidos en este período</td></tr>'; return; }
 
   const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
   const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
@@ -1359,17 +1479,27 @@ function renderHistorialCompleto() {
   const pagoBadge   = { por_pagar:'ba', pagado:'bg' };
 
   tbody.innerHTML = lista.map(p => {
-    const fecha = new Date(p.created_at);
+    const fecha    = new Date(p.created_at);
+    const detalles = detalleByPedido[p.id] || [];
+    const detHTML  = detalles.length
+      ? detalles.map(d => `<span class="detail-tag">${d.cantidad}× ${d.productos?.nombre || '?'}</span>`).join('')
+      : '<span style="color:var(--t3);">Sin detalle</span>';
     return `
       <tr>
         <td class="precio">#${p.id}</td>
         <td style="font-size:12px;">${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'})}</td>
         <td style="font-size:12px;color:var(--t2);">${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
         <td>${canalLabel[p.canal] || p.canal}</td>
-        <td>${p.mesa || '—'}</td>
+        <td>${p.mesa || '—'}${p.comensales ? ` <span style="font-size:11px;color:var(--t3);">·${p.comensales}p</span>` : ''}</td>
         <td><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado] || p.estado}</span></td>
         <td>${p.pago_estado ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>` : '—'}</td>
         <td class="precio">$${parseFloat(p.total||0).toFixed(2)}</td>
+        <td><button class="btn btn-sm" onclick="toggleDetalle('det-${p.id}')">Ver</button></td>
+      </tr>
+      <tr class="detail-row" id="det-${p.id}">
+        <td class="detail-cell" colspan="9">
+          <div class="detail-items">${detHTML}</div>
+        </td>
       </tr>`;
   }).join('');
 }
@@ -1542,6 +1672,82 @@ function renderAnalisisGastos() {
     <div style="font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Top categorías de gasto</div>
     ${catHTML}
   `;
+}
+
+// ── COMENSALES ────────────────────────────────────────
+function renderComensalesGrid() {
+  const grid = document.getElementById('comensales-grid');
+  if (!grid) return;
+  grid.innerHTML = Array.from({length:10},(_,i) => i+1).map(n => `
+    <button class="com-btn ${n === comensalesActual ? 'active' : ''}"
+      onclick="selComensales(${n},this)">${n}</button>
+  `).join('');
+}
+
+function selComensales(n, el) {
+  comensalesActual = n;
+  document.querySelectorAll('.com-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── TOGGLE DETALLE HISTORIAL ──────────────────────────
+function toggleDetalle(id) {
+  const row = document.getElementById(id);
+  if (row) row.classList.toggle('open');
+}
+
+// ── SUBCATEGORÍAS CRUD ────────────────────────────────
+function abrirModalGestionSubcat() {
+  document.getElementById('mov-subcat-gestion').classList.add('open');
+  renderSubcatLista();
+}
+
+function renderSubcatLista() {
+  const catId = parseInt(document.getElementById('sg-cat')?.value);
+  const cont  = document.getElementById('subcat-lista');
+  if (!cont) return;
+  if (!catId) { cont.innerHTML = ''; return; }
+  const subs = DB.subcategorias.filter(s => s.categoria_id === catId);
+  if (!subs.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px 0;">Sin subcategorías en esta categoría</div>';
+    return;
+  }
+  cont.innerHTML = subs.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);">
+      <span style="font-size:13px;">${s.nombre}</span>
+      <button class="btn btn-sm btn-danger" onclick="borrarSubcat(${s.id},'${s.nombre.replace(/'/g,"\\'")}')">Borrar</button>
+    </div>
+  `).join('');
+}
+
+async function guardarSubcat() {
+  const nombre = document.getElementById('sg-nombre')?.value.trim();
+  const catId  = parseInt(document.getElementById('sg-cat')?.value);
+  if (!nombre) { toast('Ingresa el nombre', 'err'); return; }
+  if (!catId)  { toast('Selecciona una categoría', 'err'); return; }
+  const { error } = await sb.from('subcategorias').insert({ nombre, categoria_id: catId });
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  document.getElementById('sg-nombre').value = '';
+  toast('Subcategoría agregada ✓', 'ok');
+  await cargarCategorias();
+  renderSubcatLista();
+}
+
+function borrarSubcat(id, nombre) {
+  abrirConfirm(
+    `¿Borrar la subcategoría "${nombre}"? Los productos de esta subcategoría quedarán sin subcategoría asignada.`,
+    async () => {
+      // Quitar subcategoria_id de productos que la tienen
+      await sb.from('productos').update({ subcategoria_id: null }).eq('subcategoria_id', id);
+      const { error } = await sb.from('subcategorias').delete().eq('id', id);
+      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      toast('Subcategoría eliminada', 'ok');
+      await cargarCategorias();
+      await cargarProductos();
+      renderSubcatLista();
+    },
+    'Sí, borrar'
+  );
 }
 
 // ── TOAST ─────────────────────────────────────────────
