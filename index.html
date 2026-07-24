@@ -1330,6 +1330,7 @@ async function cargarGastos() {
   // Usar todos los gastos (sin filtro de tipo) para los indicadores
   renderGastosIndicadores(todos || [], pedMes || [], inicio, fin);
   await sugerirRecurrentes(mes, inicio);
+}
 
 function abrirModalGasto(id = null) {
   const hoy = new Date().toISOString().split('T')[0];
