@@ -418,8 +418,10 @@ tr:hover td{background:#FAFAF8;}
       <option value="fijo">Solo fijos</option>
       <option value="variable">Solo variables</option>
     </select>
+    <button class="btn btn-sm" id="btn-aplicar-recurrentes" onclick="aplicarRecurrentes()" style="display:none;">🔄 Aplicar recurrentes</button>
     <button class="btn btn-p btn-sm" onclick="abrirModalGasto()" style="margin-left:auto;">+ Registrar gasto</button>
   </div>
+  <div id="gastos-recurrentes-banner" style="display:none;margin-bottom:12px;"></div>
 
   <div class="tw">
     <div class="th2">
@@ -432,6 +434,9 @@ tr:hover td{background:#FAFAF8;}
       <tbody id="gastos-tbody"></tbody>
     </table>
   </div>
+
+  <!-- Indicadores de gastos -->
+  <div id="gastos-indicadores" style="margin-top:20px;"></div>
 </div>
 
 <!-- ── DASHBOARD ──────────────────────────────────────── -->
@@ -535,11 +540,38 @@ tr:hover td{background:#FAFAF8;}
     </div>
   </div>
 
-  <!-- Análisis de gastos -->
-  <div class="dash-section" style="margin-bottom:24px;">
-    <div class="dash-section-title">💰 Análisis de gastos</div>
-    <div class="chart-box">
-      <div id="gastos-analytics"><div class="empty" style="padding:24px;">Cargando...</div></div>
+  <!-- Top por categoría + Productos sin movimiento -->
+  <div class="charts-grid" style="margin-bottom:24px;">
+    <div class="dash-section">
+      <div class="dash-section-title">🏷️ Top por categoría</div>
+      <div class="chart-box" style="min-height:200px;">
+        <div id="top-por-cat-wrap"><div class="empty" style="padding:24px;">Cargando...</div></div>
+      </div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">⚠️ Sin ventas en este período</div>
+      <div class="chart-box" style="min-height:200px;">
+        <div id="sin-movimiento-wrap"><div class="empty" style="padding:24px;">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hora pico + Día de semana -->
+  <div class="charts-grid" style="margin-bottom:24px;">
+    <div class="dash-section">
+      <div class="dash-section-title">⏰ Hora pico de ventas</div>
+      <div class="chart-box">
+        <div style="position:relative;min-height:180px;">
+          <canvas id="chart-hora-pico"></canvas>
+          <div id="chart-hora-empty" class="empty" style="display:none;padding:40px;">Sin datos en este período</div>
+        </div>
+      </div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">📅 Ventas por día de semana</div>
+      <div class="chart-box" style="min-height:180px;">
+        <div id="dia-semana-wrap"><div class="empty" style="padding:24px;">Cargando...</div></div>
+      </div>
     </div>
   </div>
 
@@ -745,9 +777,16 @@ tr:hover td{background:#FAFAF8;}
             <option value="Otro">Otro</option>
           </select>
         </div>
+      <div class="frow">
         <div class="fld">
           <label class="flbl">Fecha *</label>
           <input class="finp" id="mg-fecha" type="date">
+        </div>
+        <div class="fld" style="display:flex;align-items:flex-end;padding-bottom:2px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="mg-recurrente" style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;">
+            <span>Gasto recurrente</span>
+          </label>
         </div>
       </div>
     </div>
@@ -1259,46 +1298,60 @@ async function cargarGastos() {
   document.getElementById('gasto-count').textContent = `${lista.length} registro${lista.length !== 1 ? 's' : ''}`;
 
   const tbody = document.getElementById('gastos-tbody');
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Sin gastos registrados en este período</td></tr>'; return; }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Sin gastos registrados en este período</td></tr>'; }
+  else {
+    const esAdmin = SESSION?.rol === 'admin';
+    tbody.innerHTML = lista.map(g => `
+      <tr>
+        <td>
+          <strong>${g.descripcion}</strong>
+          ${g.recurrente ? '<span class="badge bpu" style="margin-left:6px;font-size:10px;">🔄 Recurrente</span>' : ''}
+        </td>
+        <td>${g.categoria || '—'}</td>
+        <td><span class="badge ${g.tipo === 'fijo' ? 'bpu' : 'ba'}">${g.tipo === 'fijo' ? 'Fijo' : 'Variable'}</span></td>
+        <td class="precio">$${parseFloat(g.monto).toFixed(2)}</td>
+        <td style="font-size:12px;">${g.fecha}</td>
+        <td style="white-space:nowrap;">
+          ${esAdmin ? `
+            <button class="btn btn-sm" onclick="abrirModalGasto(${g.id})">Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="borrarGasto(${g.id},'${g.descripcion.replace(/'/g,"\\'")}') " style="margin-left:4px;">Borrar</button>
+          ` : '—'}
+        </td>
+      </tr>
+    `).join('');
+  }
 
-  const esAdmin = SESSION?.rol === 'admin';
-  tbody.innerHTML = lista.map(g => `
-    <tr>
-      <td><strong>${g.descripcion}</strong></td>
-      <td>${g.categoria || '—'}</td>
-      <td><span class="badge ${g.tipo === 'fijo' ? 'bpu' : 'ba'}">${g.tipo === 'fijo' ? 'Fijo' : 'Variable'}</span></td>
-      <td class="precio">$${parseFloat(g.monto).toFixed(2)}</td>
-      <td style="font-size:12px;">${g.fecha}</td>
-      <td style="white-space:nowrap;">
-        ${esAdmin ? `
-          <button class="btn btn-sm" onclick="abrirModalGasto(${g.id})">Editar</button>
-          <button class="btn btn-sm btn-danger" onclick="borrarGasto(${g.id},'${g.descripcion.replace(/'/g,"\\'")}') " style="margin-left:4px;">Borrar</button>
-        ` : '—'}
-      </td>
-    </tr>
-  `).join('');
-}
+  // Cargar ingresos del mes para indicadores
+  const { data: pedMes } = await sb.from('pedidos')
+    .select('total, estado')
+    .gte('created_at', inicio + 'T00:00:00')
+    .lte('created_at', fin + 'T23:59:59');
+
+  // Usar todos los gastos (sin filtro de tipo) para los indicadores
+  renderGastosIndicadores(todos || [], pedMes || [], inicio, fin);
+  await sugerirRecurrentes(mes, inicio);
 
 function abrirModalGasto(id = null) {
   const hoy = new Date().toISOString().split('T')[0];
-  document.getElementById('mg-id').value   = '';
-  document.getElementById('mg-desc').value = '';
-  document.getElementById('mg-tipo').value = 'variable';
-  document.getElementById('mg-monto').value= '';
-  document.getElementById('mg-cat').value  = 'Ingredientes';
-  document.getElementById('mg-fecha').value= hoy;
+  document.getElementById('mg-id').value        = '';
+  document.getElementById('mg-desc').value      = '';
+  document.getElementById('mg-tipo').value      = 'variable';
+  document.getElementById('mg-monto').value     = '';
+  document.getElementById('mg-cat').value       = 'Ingredientes';
+  document.getElementById('mg-fecha').value     = hoy;
+  document.getElementById('mg-recurrente').checked = false;
   document.getElementById('mg-title').textContent = 'Registrar gasto';
 
   if (id) {
-    // cargar datos del gasto para editar
     sb.from('gastos').select('*').eq('id', id).single().then(({ data }) => {
       if (!data) return;
-      document.getElementById('mg-id').value    = data.id;
-      document.getElementById('mg-desc').value  = data.descripcion;
-      document.getElementById('mg-tipo').value  = data.tipo;
-      document.getElementById('mg-monto').value = data.monto;
-      document.getElementById('mg-cat').value   = data.categoria || 'Otro';
-      document.getElementById('mg-fecha').value = data.fecha;
+      document.getElementById('mg-id').value        = data.id;
+      document.getElementById('mg-desc').value      = data.descripcion;
+      document.getElementById('mg-tipo').value      = data.tipo;
+      document.getElementById('mg-monto').value     = data.monto;
+      document.getElementById('mg-cat').value       = data.categoria || 'Otro';
+      document.getElementById('mg-fecha').value     = data.fecha;
+      document.getElementById('mg-recurrente').checked = data.recurrente || false;
       document.getElementById('mg-title').textContent = 'Editar gasto';
     });
   }
@@ -1321,7 +1374,8 @@ async function guardarGasto() {
   if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'err'); return; }
   if (!fecha)          { toast('Ingresa la fecha', 'err'); return; }
 
-  const payload = { descripcion: desc, tipo, monto, categoria: cat, fecha, registrado_por: SESSION.id };
+  const recurrente = document.getElementById('mg-recurrente')?.checked || false;
+  const payload = { descripcion: desc, tipo, monto, categoria: cat, fecha, registrado_por: SESSION.id, recurrente };
   let error;
   if (id) { ({ error } = await sb.from('gastos').update(payload).eq('id', parseInt(id))); }
   else    { ({ error } = await sb.from('gastos').insert({ ...payload, erased: false })); }
@@ -1449,6 +1503,7 @@ let DASH_GASTOS   = [];
 let DASH_PREV_ING = 0;
 let chartVentas   = null;
 let chartCat      = null;
+let chartHoraPico = null;
 let DASH_FILTRO   = { catId: null, subcatId: null, prodId: null };
 
 function setPeriod(period, el) {
@@ -1540,7 +1595,10 @@ async function cargarDashboard() {
   renderGraficaVentas();
   renderGraficaCategoria();
   renderTopProductos();
-  renderAnalisisGastos();
+  renderTopPorCategoria();
+  renderHoraPico();
+  renderDiaSemana();
+  renderProductosSinMovimiento();
   renderHistorialCompleto();
 }
 
@@ -1960,7 +2018,8 @@ function limpiarFiltrosDash() {
   renderGraficaVentas();
   renderGraficaCategoria();
   renderTopProductos();
-  renderAnalisisGastos();
+  renderTopPorCategoria();
+  renderProductosSinMovimiento();
   renderHistorialCompleto();
 }
 
@@ -2251,6 +2310,237 @@ async function resetPasswordUsuario(email, nombre) {
     },
     'Sí, enviar enlace'
   );
+}
+
+// ── INDICADORES DE GASTOS (sección Gastos) ───────────
+function renderGastosIndicadores(gastos, pedidos, inicio, fin) {
+  const cont = document.getElementById('gastos-indicadores');
+  if (!cont) return;
+
+  const totalGastos = gastos.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+  const activos     = pedidos.filter(p => p.estado !== 'cancelado');
+  const ingresos    = activos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
+  const ratio       = ingresos > 0 ? (totalGastos / ingresos) * 100 : 0;
+  const dias        = inicio && fin ? Math.max(1, Math.ceil((new Date(fin) - new Date(inicio)) / 86400000) + 1) : 30;
+  const gastoDiario = totalGastos / dias;
+  const utilidad    = Math.max(0, ingresos - totalGastos);
+
+  let alertaHTML = '';
+  if (ratio > 80) {
+    alertaHTML = `<div class="alerta-rd">⚠️ <strong>Alerta:</strong> Los gastos son el <strong>${ratio.toFixed(1)}%</strong> de los ingresos. Revisar costos urgente.</div>`;
+  } else if (ratio > 60) {
+    alertaHTML = `<div class="alerta-am">💡 Los gastos son el <strong>${ratio.toFixed(1)}%</strong> de los ingresos. Margen aceptable.</div>`;
+  }
+
+  const byCat = {};
+  gastos.forEach(g => {
+    const c = g.categoria || 'Otro';
+    byCat[c] = (byCat[c] || 0) + parseFloat(g.monto || 0);
+  });
+  const top3   = Object.entries(byCat).sort((a,b) => b[1]-a[1]).slice(0,3);
+  const maxCat = top3[0]?.[1] || 1;
+  const catHTML = top3.length ? top3.map(([cat, monto]) => {
+    const pct  = totalGastos > 0 ? Math.round((monto / totalGastos) * 100) : 0;
+    const barW = Math.round((monto / maxCat) * 100);
+    return `<div class="top-item">
+      <div class="top-item-label"><span>${cat}</span>
+      <span style="font-family:'DM Mono',monospace;color:var(--t2);font-size:11px;">$${monto.toFixed(0)} (${pct}%)</span></div>
+      <div class="top-item-bar"><div class="top-item-fill" style="width:${barW}%;background:var(--am);"></div></div>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--t3);">Sin gastos en este período</div>';
+
+  const ratioColor = ratio > 80 ? 'var(--rd)' : ratio > 60 ? 'var(--am)' : 'var(--gn)';
+
+  cont.innerHTML = `
+    ${alertaHTML}
+    <div class="dash-section-title" style="margin-bottom:12px;">📊 Indicadores del período</div>
+    <div class="dash-sc-grid" style="margin-bottom:20px;">
+      <div class="sc"><div class="sc-label">Total gastos</div>
+        <div class="sc-val" style="color:var(--rd);">$${totalGastos.toLocaleString('es-MX',{minimumFractionDigits:0})}</div></div>
+      <div class="sc"><div class="sc-label">Ratio gasto/ingreso</div>
+        <div class="sc-val" style="color:${ratioColor};">${ingresos > 0 ? ratio.toFixed(1) + '%' : '—'}</div></div>
+      <div class="sc"><div class="sc-label">Gasto diario prom.</div>
+        <div class="sc-val" style="color:var(--am);">$${gastoDiario.toLocaleString('es-MX',{minimumFractionDigits:0})}</div></div>
+      <div class="sc gn"><div class="sc-label">Utilidad estimada</div>
+        <div class="sc-val">$${utilidad.toLocaleString('es-MX',{minimumFractionDigits:0})}</div></div>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Top categorías de gasto</div>
+    ${catHTML}`;
+}
+
+// ── GASTOS RECURRENTES ────────────────────────────────
+async function sugerirRecurrentes(mesSel, inicio) {
+  const banner = document.getElementById('gastos-recurrentes-banner');
+  const btnApl = document.getElementById('btn-aplicar-recurrentes');
+  if (!banner || !btnApl) return;
+
+  // Verificar si hay recurrentes del mes anterior no aplicados en el mes seleccionado
+  const [anio, m] = mesSel.split('-');
+  const fechaAnterior = new Date(parseInt(anio), parseInt(m) - 2, 1);
+  const mesAnterior   = fechaAnterior.getFullYear() + '-' +
+    String(fechaAnterior.getMonth() + 1).padStart(2,'0') + '-01';
+  const finAnterior   = new Date(parseInt(anio), parseInt(m) - 1, 0).toISOString().split('T')[0];
+
+  const { data: recurrentes } = await sb.from('gastos')
+    .select('*').eq('recurrente', true).eq('erased', false)
+    .gte('fecha', mesAnterior).lte('fecha', finAnterior);
+
+  if (!recurrentes?.length) { banner.style.display = 'none'; btnApl.style.display = 'none'; return; }
+
+  // Ver si ya existen en el mes actual
+  const { data: yaExisten } = await sb.from('gastos')
+    .select('descripcion').eq('erased', false)
+    .gte('fecha', inicio).lte('fecha', new Date(parseInt(anio), parseInt(m), 0).toISOString().split('T')[0]);
+
+  const descripsActuales = new Set((yaExisten || []).map(g => g.descripcion.toLowerCase()));
+  const pendientes = recurrentes.filter(g => !descripsActuales.has(g.descripcion.toLowerCase()));
+
+  if (!pendientes.length) { banner.style.display = 'none'; btnApl.style.display = 'none'; return; }
+
+  banner.style.display = 'block';
+  btnApl.style.display = '';
+  banner.innerHTML = `<div class="alerta-am">
+    🔄 Tienes <strong>${pendientes.length}</strong> gasto${pendientes.length !== 1 ? 's' : ''} recurrente${pendientes.length !== 1 ? 's' : ''} del mes anterior pendiente${pendientes.length !== 1 ? 's' : ''} de aplicar:
+    ${pendientes.map(g => `<span class="detail-tag" style="margin-left:4px;">${g.descripcion} $${parseFloat(g.monto).toFixed(0)}</span>`).join('')}
+  </div>`;
+  btnApl._pendientes = pendientes;
+}
+
+async function aplicarRecurrentes() {
+  const btnApl = document.getElementById('btn-aplicar-recurrentes');
+  const pendientes = btnApl?._pendientes;
+  if (!pendientes?.length) return;
+
+  const mes  = document.getElementById('gasto-mes').value;
+  const [anio, m] = mes.split('-');
+  const hoy  = new Date().toISOString().split('T')[0];
+  const fecha = hoy.startsWith(`${anio}-${m}`) ? hoy : `${anio}-${m}-01`;
+
+  const inserts = pendientes.map(g => ({
+    descripcion: g.descripcion, tipo: g.tipo, monto: g.monto,
+    categoria: g.categoria, fecha, recurrente: true,
+    registrado_por: SESSION.id, erased: false
+  }));
+
+  const { error } = await sb.from('gastos').insert(inserts);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  toast(`${inserts.length} gasto${inserts.length !== 1 ? 's' : ''} aplicado${inserts.length !== 1 ? 's' : ''} ✓`, 'ok');
+  await cargarGastos();
+}
+
+// ── DASHBOARD — NUEVAS FUNCIONES ANALÍTICAS ───────────
+function renderTopPorCategoria() {
+  const cont = document.getElementById('top-por-cat-wrap');
+  if (!cont) return;
+  const dets = getDetallesFiltrados();
+  if (!dets.length) { cont.innerHTML = '<div class="empty" style="padding:24px;">Sin datos en este período</div>'; return; }
+
+  const byCat = {};
+  dets.forEach(d => {
+    const cat    = DB.categorias.find(c => c.id === d.productos?.categoria_id);
+    const catNom = cat?.nombre || 'Sin categoría';
+    const prodNom = d.productos?.nombre || 'Desconocido';
+    if (!byCat[catNom]) byCat[catNom] = {};
+    byCat[catNom][prodNom] = (byCat[catNom][prodNom] || 0) + d.cantidad;
+  });
+
+  const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+  cont.innerHTML = Object.entries(byCat).map(([cat, prods]) => {
+    const top5  = Object.entries(prods).sort((a,b) => b[1]-a[1]).slice(0,5);
+    const maxQ  = top5[0]?.[1] || 1;
+    return `<div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${cat}</div>
+      ${top5.map(([nom, qty], i) => {
+        const pct = Math.round((qty / maxQ) * 100);
+        return `<div class="top-item">
+          <div class="top-item-label">
+            <span style="font-size:12px;">${medals[i]} ${nom}</span>
+            <span style="font-family:'DM Mono',monospace;color:var(--t2);font-size:11px;">${qty} uds</span>
+          </div>
+          <div class="top-item-bar"><div class="top-item-fill" style="width:${pct}%;"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderHoraPico() {
+  const canvas  = document.getElementById('chart-hora-pico');
+  const emptyEl = document.getElementById('chart-hora-empty');
+  if (!canvas) return;
+
+  const activos = DASH_DATA.filter(p => p.estado !== 'cancelado');
+  const byHour  = {};
+  for (let h = 0; h < 24; h++) byHour[h] = 0;
+  activos.forEach(p => { byHour[new Date(p.created_at).getHours()]++; });
+
+  const labels = [], values = [];
+  for (let h = 6; h <= 23; h++) { labels.push(h + ':00'); values.push(byHour[h]); }
+
+  if (chartHoraPico) { chartHoraPico.destroy(); chartHoraPico = null; }
+
+  if (!values.some(v => v > 0)) {
+    canvas.style.display = 'none'; if (emptyEl) emptyEl.style.display = 'block'; return;
+  }
+  canvas.style.display = 'block'; if (emptyEl) emptyEl.style.display = 'none';
+  const maxV = Math.max(...values);
+
+  chartHoraPico = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Pedidos', data: values,
+        backgroundColor: values.map(v => v === maxV && v > 0 ? 'rgba(192,82,26,.9)' : 'rgba(192,82,26,.35)'),
+        borderRadius: 3 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { ticks: { font: { size: 10 } } } } }
+  });
+}
+
+function renderDiaSemana() {
+  const cont = document.getElementById('dia-semana-wrap');
+  if (!cont) return;
+  const activos = DASH_DATA.filter(p => p.estado !== 'cancelado');
+  const dias    = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const byDia   = [0,0,0,0,0,0,0];
+  activos.forEach(p => { byDia[new Date(p.created_at).getDay()]++; });
+  const maxD = Math.max(...byDia) || 1;
+
+  if (!activos.length) { cont.innerHTML = '<div class="empty" style="padding:24px;">Sin datos</div>'; return; }
+
+  cont.innerHTML = dias.map((d, i) => {
+    const pct    = Math.round((byDia[i] / maxD) * 100);
+    const esTope = byDia[i] === Math.max(...byDia) && byDia[i] > 0;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:12px;font-weight:${esTope?'700':'400'};color:${esTope?'var(--acc)':'var(--t2)'};min-width:30px;">${d}</span>
+      <div style="flex:1;background:var(--s2);border-radius:4px;height:8px;">
+        <div style="background:${esTope?'var(--acc)':'rgba(192,82,26,.35)'};border-radius:4px;height:8px;width:${pct}%;transition:width .4s;"></div>
+      </div>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--t2);min-width:56px;text-align:right;">${byDia[i]} pedido${byDia[i]!==1?'s':''}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderProductosSinMovimiento() {
+  const cont = document.getElementById('sin-movimiento-wrap');
+  if (!cont) return;
+  const vendidos  = new Set(DASH_DETALLES.map(d => d.producto_id));
+  const sinVentas = DB.productos.filter(p => p.activo && !vendidos.has(p.id));
+  if (!sinVentas.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gn);font-size:13px;">✅ Todos los productos activos tuvieron ventas en este período</div>';
+    return;
+  }
+  cont.innerHTML = sinVentas.map(p => {
+    const cat = DB.categorias.find(c => c.id === p.categoria_id);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);">
+      <div>
+        <div style="font-size:13px;font-weight:500;">${p.nombre}</div>
+        <div style="font-size:11px;color:var(--t3);">${cat?.nombre || '—'}</div>
+      </div>
+      <span class="badge br">Sin ventas</span>
+    </div>`;
+  }).join('');
 }
 
 // ── TOAST ─────────────────────────────────────────────
