@@ -2270,7 +2270,10 @@ async function guardarUsuario() {
     const sbTemp = supabase.createClient(SURL, SKEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
     });
-    const { data: newUser, error: errAuth } = await sbTemp.auth.signUp({ email, password: pass });
+    const { data: newUser, error: errAuth } = await sbTemp.auth.signUp({
+      email, password: pass,
+      options: { emailRedirectTo: 'https://ahr-projectplace.github.io/ERP-REST-DS/' }
+    });
     if (errAuth) { toast('Error al crear acceso: ' + errAuth.message, 'err'); return; }
     if (!newUser?.user?.id) { toast('No se pudo obtener el ID del usuario creado', 'err'); return; }
 
@@ -2279,7 +2282,8 @@ async function guardarUsuario() {
     if (errPerf) { toast('Error al registrar perfil: ' + errPerf.message, 'err'); return; }
 
     await logAction('usuario_creado', 'perfiles', newUser.user.id, `${nombre} (${rol}) · ${email}`);
-    toast(`Usuario ${nombre} creado ✓`, 'ok');
+    toast(`✓ Usuario creado. Ve a Supabase → Authentication → Users → confirma "${email}" para que pueda entrar.`, 'ok');
+    setTimeout(() => toast(`Confirma el correo de ${nombre} en Supabase para activar su acceso.`, ''), 4000);
   }
 
   cerrarModalUsuario();
