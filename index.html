@@ -1157,19 +1157,26 @@ async function enviarPedido() {
 
 // ── HISTORIAL ─────────────────────────────────────────
 async function cargarHistorial() {
-  // Usar medianoche LOCAL para evitar error de timezone con UTC
-  const ahora      = new Date();
-  const inicioHoy  = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
-
-  const { data } = await sb.from('pedidos')
-    .select('*')
-    .gte('created_at', inicioHoy.toISOString())
-    .order('created_at', { ascending: false });
-
   const tbody = document.getElementById('hist-tbody');
   if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--t3);font-size:13px;">Cargando...</td></tr>';
+
+  // Últimas 24h — evita cualquier problema de timezone
+  const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await sb.from('pedidos')
+    .select('*')
+    .gte('created_at', hace24h)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:16px;color:var(--rd);font-size:13px;">Error al cargar: ${error.message}</td></tr>`;
+    console.error('cargarHistorial error:', error);
+    return;
+  }
+
   const lista = data || [];
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos hoy</td></tr>'; return; }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos en las últimas 24 horas</td></tr>'; return; }
 
   const estadoLabel  = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
   const estadoBadge  = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
