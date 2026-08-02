@@ -1157,10 +1157,13 @@ async function enviarPedido() {
 
 // ── HISTORIAL ─────────────────────────────────────────
 async function cargarHistorial() {
-  const hoy = new Date().toISOString().split('T')[0];
+  // Usar medianoche LOCAL para evitar error de timezone con UTC
+  const ahora      = new Date();
+  const inicioHoy  = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+
   const { data } = await sb.from('pedidos')
     .select('*')
-    .gte('created_at', hoy + 'T00:00:00')
+    .gte('created_at', inicioHoy.toISOString())
     .order('created_at', { ascending: false });
 
   const tbody = document.getElementById('hist-tbody');
