@@ -238,7 +238,16 @@ tr:hover td{background:#FAFAF8;}
 .chip-sub{padding:4px 10px;border-radius:20px;border:1px solid var(--bd2);background:var(--surface);font-size:11px;cursor:pointer;color:var(--t2);transition:all .15s;font-family:inherit;}
 .chip-sub.active{background:var(--t);color:#fff;border-color:var(--t);}
 
-/* ── DETALLE ACCORDION ─────────────────────────────── */
+/* ── NOTAS POR ÍTEM ────────────────────────────────── */
+.nota-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--bd2);background:transparent;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.nota-btn:hover{background:var(--am2);}
+.nota-btn.activa{background:var(--am2);border-color:var(--am);}
+.nota-item-wrap{padding:4px 14px 8px 14px;}
+.nota-item-inp{width:100%;padding:5px 8px;border:1px solid var(--am);border-radius:6px;font-family:inherit;font-size:11px;background:var(--am2);color:var(--t);outline:none;}
+
+/* ── RONDA ─────────────────────────────────────────── */
+.ronda-header{background:var(--am2);border-bottom:1px solid var(--am);}
+</style>
 .detail-row{display:none;background:var(--bg);}
 .detail-row.open{display:table-row;}
 .detail-cell{padding:10px 16px 10px 32px;font-size:12px;color:var(--t2);}
@@ -305,15 +314,13 @@ tr:hover td{background:#FAFAF8;}
           <button class="canal-btn" onclick="setCanal('app',this)">📱 App</button>
         </div>
         <div id="mesa-wrap">
-          <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
-            <div>
-              <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Número de mesa</label>
-              <input class="inp" id="inp-mesa" placeholder="Ej. 3" style="width:100px;" oninput="actualizarMesa()">
-            </div>
-            <div>
-              <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Comensales</label>
-              <div class="comensales-grid" id="comensales-grid"></div>
-            </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Mesa</label>
+            <div class="comensales-grid" id="mesa-grid"></div>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Comensales</label>
+            <div class="comensales-grid" id="comensales-grid"></div>
           </div>
         </div>
       </div>
@@ -324,7 +331,10 @@ tr:hover td{background:#FAFAF8;}
       <div class="prod-grid" id="prod-grid"></div>
     </div>
     <div class="order-panel">
-      <div class="order-header">Orden actual</div>
+      <div class="order-header" id="order-header-el" style="display:flex;align-items:center;justify-content:space-between;">
+        <span id="order-header-txt">Orden actual</span>
+        <button class="btn btn-sm btn-danger" id="btn-cancelar-ronda" onclick="cancelarRonda()" style="display:none;padding:3px 8px;font-size:11px;">✕ Cancelar</button>
+      </div>
       <div class="order-items" id="order-items">
         <div class="order-empty">Toca un producto para agregarlo</div>
       </div>
@@ -333,7 +343,7 @@ tr:hover td{background:#FAFAF8;}
         <textarea class="order-notas" id="order-notas" rows="2" placeholder="Notas del pedido (opcional)..."></textarea>
         <div class="order-actions">
           <button class="btn btn-sm" onclick="limpiarPedido()" style="flex:1;">🗑 Limpiar</button>
-          <button class="btn btn-p" onclick="enviarPedido()" style="flex:2;">✓ Enviar a cocina</button>
+          <button class="btn btn-p" id="btn-enviar-pedido" onclick="enviarPedido()" style="flex:2;">✓ Enviar a cocina</button>
         </div>
       </div>
     </div>
@@ -350,8 +360,6 @@ tr:hover td{background:#FAFAF8;}
         <table>
           <thead>
             <tr><th>#</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Pago</th><th>Total</th><th>Hora</th><th>Acciones</th></tr>
-          </thead>
-          <tbody id="hist-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -826,10 +834,11 @@ let realtimeSub = null;
 let confirmCallback = null;
 let DB = { categorias: [], productos: [], subcategorias: [] };
 let catFiltro = null, cajaCatFiltro = null, cajSubCatFiltro = null;
-let PEDIDO = { canal: 'mesa', mesa: '', items: [] };
+let PEDIDO = { canal: 'mesa', mesa: '', mesaNum: null, items: [] };
 let comensalesActual = 1;
 let detalleByPedido  = {};
 let USUARIOS_DATA    = [];
+let RONDA            = null; // { pedidoId, mesa, rondaNum, totalAnterior }
 
 // ── CONFIRM MODAL ─────────────────────────────────────
 function abrirConfirm(msg, callback, btnLabel = 'Confirmar') {
@@ -924,6 +933,7 @@ async function initApp() {
   await cargarKDS();
   await cargarGastos();
   if (SESSION.rol === 'admin') await cargarDashboard();
+  renderMesaGrid();
   renderComensalesGrid();
   iniciarRealtime();
 }
@@ -983,8 +993,8 @@ function setCanal(canal, el) {
   el.classList.add('active');
   const mesaWrap = document.getElementById('mesa-wrap');
   if (mesaWrap) mesaWrap.style.display = canal === 'mesa' ? 'block' : 'none';
-  if (canal !== 'mesa') { PEDIDO.mesa = ''; comensalesActual = 1; }
-  if (canal === 'mesa') renderComensalesGrid();
+  if (canal !== 'mesa') { PEDIDO.mesa = ''; PEDIDO.mesaNum = null; comensalesActual = 1; }
+  if (canal === 'mesa') { renderMesaGrid(); renderComensalesGrid(); }
 }
 
 function actualizarMesa() {
@@ -1050,7 +1060,7 @@ function agregarItem(prodId) {
   if (!prod) return;
   const existing = PEDIDO.items.find(i => i.producto_id === prodId);
   if (existing) { existing.cantidad++; }
-  else { PEDIDO.items.push({ producto_id: prodId, nombre: prod.nombre, precio: prod.precio, cantidad: 1 }); }
+  else { PEDIDO.items.push({ producto_id: prodId, nombre: prod.nombre, precio: prod.precio, cantidad: 1, nota: '' }); }
   renderOrden();
 }
 
@@ -1077,6 +1087,12 @@ function renderOrden() {
         <button class="qty-btn" onclick="cambiarCantidad(${i.producto_id},1)">+</button>
       </div>
       <div class="order-item-price">$${(i.precio * i.cantidad).toFixed(2)}</div>
+      <button class="nota-btn ${i.nota ? 'activa' : ''}" onclick="toggleNotaItem(${i.producto_id})" title="Agregar nota">📝</button>
+    </div>
+    <div id="nota-item-${i.producto_id}" style="display:${i.nota ? 'block' : 'none'};" class="nota-item-wrap">
+      <input class="nota-item-inp" placeholder="Ej. sin chile, extra limón..."
+        value="${i.nota || ''}"
+        oninput="setItemNota(${i.producto_id}, this.value)">
     </div>
   `).join('');
   const total = PEDIDO.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
@@ -1091,12 +1107,31 @@ function limpiarPedido() {
 
 async function enviarPedido() {
   if (!PEDIDO.items.length) { toast('Agrega al menos un producto', 'err'); return; }
-  if (PEDIDO.canal === 'mesa' && !document.getElementById('inp-mesa').value.trim()) {
-    toast('Ingresa el número de mesa', 'err'); return;
+
+  // ── MODO RONDA ──
+  if (RONDA) {
+    const detalleRonda = PEDIDO.items.map(i => ({
+      pedido_id: RONDA.pedidoId, producto_id: i.producto_id,
+      cantidad: i.cantidad, precio_unitario: i.precio,
+      nota: i.nota || null, ronda: RONDA.rondaNum
+    }));
+    const { error: errDet } = await sb.from('detalle_pedido').insert(detalleRonda);
+    if (errDet) { toast('Error: ' + errDet.message, 'err'); return; }
+    const nuevoTotal = RONDA.totalAnterior + PEDIDO.items.reduce((s,i) => s + i.precio*i.cantidad, 0);
+    await sb.from('pedidos').update({ total: nuevoTotal, estado: 'nuevo', updated_at: new Date().toISOString() }).eq('id', RONDA.pedidoId);
+    toast(`Ronda ${RONDA.rondaNum} enviada a cocina ✓`, 'ok');
+    cancelarRonda();
+    await cargarHistorial();
+    return;
+  }
+
+  // ── ORDEN NUEVA ──
+  if (PEDIDO.canal === 'mesa' && !PEDIDO.mesaNum) {
+    toast('Selecciona el número de mesa', 'err'); return;
   }
   const total = PEDIDO.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const notas = document.getElementById('order-notas').value.trim();
-  const mesa  = PEDIDO.canal === 'mesa' ? document.getElementById('inp-mesa').value.trim() : null;
+  const mesa  = PEDIDO.canal === 'mesa' ? String(PEDIDO.mesaNum) : null;
 
   const { data: pedido, error: errPed } = await sb.from('pedidos')
     .insert({ canal: PEDIDO.canal, mesa, estado: 'nuevo', notas: notas || null, total,
@@ -1107,15 +1142,15 @@ async function enviarPedido() {
 
   const detalle = PEDIDO.items.map(i => ({
     pedido_id: pedido.id, producto_id: i.producto_id,
-    cantidad: i.cantidad, precio_unitario: i.precio
+    cantidad: i.cantidad, precio_unitario: i.precio,
+    nota: i.nota || null, ronda: 1
   }));
   const { error: errDet } = await sb.from('detalle_pedido').insert(detalle);
   if (errDet) { toast('Error al guardar detalle: ' + errDet.message, 'err'); return; }
 
   toast(`Pedido #${pedido.id} enviado a cocina ✓`, 'ok');
   limpiarPedido();
-  document.getElementById('inp-mesa').value = '';
-  PEDIDO.mesa = '';
+  document.getElementById('order-notas').value = '';
   await cargarHistorial();
 }
 
@@ -1151,6 +1186,9 @@ async function cargarHistorial() {
         ? `<span style="color:var(--t3);font-size:12px;">${p.estado === 'cancelado' ? '✕ Cancelado' : '✓ Entregado'}</span>`
         : '—';
 
+    const puedeRonda = p.canal === 'mesa' && p.estado !== 'cancelado' && p.pago_estado !== 'pagado';
+    const btnRonda   = puedeRonda ? `<button class="btn btn-sm" onclick="activarModoRonda(${p.id},'${p.mesa || ''}',${p.total})" style="margin-left:4px;" title="Agregar ronda">➕</button>` : '';
+
     const accionAdmin = esAdmin && p.estado !== 'cancelado'
       ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" style="margin-left:4px;">Cancelar</button>`
       : '';
@@ -1164,7 +1202,7 @@ async function cargarHistorial() {
         <td>${pagoCell}</td>
         <td class="precio">$${parseFloat(p.total).toFixed(2)}</td>
         <td style="font-size:12px;color:var(--t2);">${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
-        <td style="white-space:nowrap;">${accionEntrega}${accionAdmin}</td>
+        <td style="white-space:nowrap;">${accionEntrega}${btnRonda}${accionAdmin}</td>
       </tr>
     `;
   }).join('');
@@ -1206,7 +1244,7 @@ function cancelarPedido(id) {
 // ── KDS — COCINA ──────────────────────────────────────
 async function cargarKDS() {
   const { data } = await sb.from('pedidos')
-    .select('*, detalle_pedido(cantidad, precio_unitario, productos(nombre))')
+    .select('*, detalle_pedido(cantidad, precio_unitario, nota, ronda, productos(nombre))')
     .in('estado', ['nuevo', 'en_preparacion'])
     .order('created_at', { ascending: true });
 
@@ -1233,9 +1271,13 @@ async function cargarKDS() {
     const btnLabel = esNuevo ? '▶ Iniciar preparación' : '✓ Marcar listo';
     const btnClass = esNuevo ? 'btn btn-am' : 'btn btn-gn';
     const nextEst  = esNuevo ? 'en_preparacion' : 'listo';
-    const items    = (p.detalle_pedido || []).map(d =>
-      `<div class="kds-item"><span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}</div>`
-    ).join('');
+    const items = (p.detalle_pedido || []).map(d => {
+      const rondaBadge = (d.ronda > 1) ? `<span class="badge ba" style="font-size:10px;margin-left:4px;">R${d.ronda}</span>` : '';
+      const notaItem   = d.nota ? `<div style="color:var(--am);font-size:11px;padding-left:24px;margin-top:2px;">→ ${d.nota}</div>` : '';
+      return `<div class="kds-item">
+        <span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}${rondaBadge}
+      </div>${notaItem}`;
+    }).join('');
     return `
       <div class="kds-card ${p.estado}">
         <div class="kds-card-head">
@@ -1877,18 +1919,35 @@ function renderAnalisisGastos() {
 }
 
 // ── COMENSALES ────────────────────────────────────────
+function renderMesaGrid() {
+  const grid = document.getElementById('mesa-grid');
+  if (!grid) return;
+  grid.innerHTML = Array.from({length:10}, (_,i) => i+1).map(n => `
+    <button class="com-btn ${PEDIDO.mesaNum === n ? 'active' : ''}"
+      onclick="selMesa(${n},this)">${n}</button>
+  `).join('');
+}
+
+function selMesa(n, el) {
+  PEDIDO.mesaNum = n;
+  PEDIDO.mesa    = String(n);
+  document.querySelectorAll('#mesa-grid .com-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
 function renderComensalesGrid() {
   const grid = document.getElementById('comensales-grid');
   if (!grid) return;
-  grid.innerHTML = Array.from({length:10},(_,i) => i+1).map(n => `
-    <button class="com-btn ${n === comensalesActual ? 'active' : ''}"
-      onclick="selComensales(${n},this)">${n}</button>
+  const opts = [{l:'1',v:1},{l:'2',v:2},{l:'3',v:3},{l:'4',v:4},{l:'5',v:5},{l:'6',v:6},{l:'6+',v:7}];
+  grid.innerHTML = opts.map(o => `
+    <button class="com-btn ${comensalesActual === o.v ? 'active' : ''}"
+      onclick="selComensales(${o.v},this)">${o.l}</button>
   `).join('');
 }
 
 function selComensales(n, el) {
   comensalesActual = n;
-  document.querySelectorAll('.com-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#comensales-grid .com-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
 }
 
@@ -1896,6 +1955,60 @@ function selComensales(n, el) {
 function toggleDetalle(id) {
   const row = document.getElementById(id);
   if (row) row.classList.toggle('open');
+}
+
+// ── NOTAS POR ÍTEM ────────────────────────────────────
+function toggleNotaItem(prodId) {
+  const el  = document.getElementById(`nota-item-${prodId}`);
+  const btn = el?.previousElementSibling?.querySelector('.nota-btn');
+  if (!el) return;
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  if (!visible) el.querySelector('input')?.focus();
+  renderOrden(); // re-render para actualizar clase activa del botón
+}
+
+function setItemNota(prodId, nota) {
+  const item = PEDIDO.items.find(i => i.producto_id === prodId);
+  if (item) item.nota = nota;
+}
+
+// ── CUENTA ABIERTA — MODO RONDA ───────────────────────
+async function activarModoRonda(pedidoId, mesa, totalAnterior) {
+  const { data: dets } = await sb.from('detalle_pedido')
+    .select('ronda').eq('pedido_id', pedidoId);
+  const maxRonda = Math.max(...(dets || []).map(d => d.ronda || 1), 1);
+
+  RONDA = { pedidoId, mesa, rondaNum: maxRonda + 1, totalAnterior };
+  PEDIDO.items = [];
+
+  const headerTxt = document.getElementById('order-header-txt');
+  const btnCancel = document.getElementById('btn-cancelar-ronda');
+  const btnEnviar = document.getElementById('btn-enviar-pedido');
+  const headerEl  = document.getElementById('order-header-el');
+
+  if (headerTxt) headerTxt.textContent = `🔄 Ronda ${RONDA.rondaNum} · Mesa ${mesa || '—'}`;
+  if (btnCancel) btnCancel.style.display = '';
+  if (btnEnviar) btnEnviar.textContent = 'Enviar ronda';
+  if (headerEl)  headerEl.classList.add('ronda-header');
+
+  renderOrden();
+  sv('pedidos');
+  toast(`Modo ronda activo — Mesa ${mesa || '—'} · Ronda ${RONDA.rondaNum}`, 'ok');
+}
+
+function cancelarRonda() {
+  RONDA = null;
+  const headerTxt = document.getElementById('order-header-txt');
+  const btnCancel = document.getElementById('btn-cancelar-ronda');
+  const btnEnviar = document.getElementById('btn-enviar-pedido');
+  const headerEl  = document.getElementById('order-header-el');
+
+  if (headerTxt) headerTxt.textContent = 'Orden actual';
+  if (btnCancel) btnCancel.style.display = 'none';
+  if (btnEnviar) btnEnviar.textContent = '✓ Enviar a cocina';
+  if (headerEl)  headerEl.classList.remove('ronda-header');
+  limpiarPedido();
 }
 
 // ── SUBCATEGORÍAS CRUD ────────────────────────────────
