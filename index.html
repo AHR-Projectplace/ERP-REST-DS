@@ -247,7 +247,8 @@ tr:hover td{background:#FAFAF8;}
 
 /* ── RONDA ─────────────────────────────────────────── */
 .ronda-header{background:var(--am2);border-bottom:1px solid var(--am);}
-</style>
+
+/* ── DETALLE ACCORDION ─────────────────────────────── */
 .detail-row{display:none;background:var(--bg);}
 .detail-row.open{display:table-row;}
 .detail-cell{padding:10px 16px 10px 32px;font-size:12px;color:var(--t2);}
@@ -285,7 +286,7 @@ tr:hover td{background:#FAFAF8;}
   <div style="display:flex;align-items:center;">
     <span class="nav-brand">🍽️ ERP Restaurante <span>sistema</span></span>
     <div class="nav-tabs">
-      <button class="ntb" id="nb-pedidos"   onclick="sv('pedidos')"   style="display:none;">Pedidos</button>
+      <button class="ntb" id="nb-pedidos" onclick="sv('pedidos');cargarHistorial()" style="display:none;">Pedidos</button>
       <button class="ntb" id="nb-cocina"    onclick="sv('cocina')"    style="display:none;">🍳 Cocina</button>
       <button class="ntb" id="nb-menu"      onclick="sv('menu')"      style="display:none;">Menú</button>
       <button class="ntb" id="nb-gastos"    onclick="sv('gastos')"    style="display:none;">Gastos</button>
@@ -1245,7 +1246,7 @@ function cancelarPedido(id) {
 async function cargarKDS() {
   const { data } = await sb.from('pedidos')
     .select('*, detalle_pedido(cantidad, precio_unitario, nota, ronda, productos(nombre))')
-    .in('estado', ['nuevo', 'en_preparacion'])
+    .in('estado', ['nuevo', 'en_preparacion', 'listo'])
     .order('created_at', { ascending: true });
 
   const lista = data || [];
@@ -1268,9 +1269,14 @@ async function cargarKDS() {
     const mins   = Math.floor((Date.now() - new Date(p.created_at)) / 60000);
     const tiempo = mins < 1 ? 'Ahora' : mins === 1 ? '1 min' : `${mins} min`;
     const esNuevo  = p.estado === 'nuevo';
-    const btnLabel = esNuevo ? '▶ Iniciar preparación' : '✓ Marcar listo';
-    const btnClass = esNuevo ? 'btn btn-am' : 'btn btn-gn';
-    const nextEst  = esNuevo ? 'en_preparacion' : 'listo';
+    const esPrep   = p.estado === 'en_preparacion';
+    const esListo  = p.estado === 'listo';
+    const btnLabel = esNuevo ? '▶ Iniciar preparación' : esPrep ? '✓ Marcar listo' : '🚀 Entregar a mesa';
+    const btnClass = esNuevo ? 'btn btn-am' : esPrep ? 'btn btn-gn' : 'btn btn-p';
+    const nextAct  = esListo
+      ? `onclick="marcarEntregadoKDS(${p.id},'${p.canal}')"`
+      : `onclick="avanzarEstado(${p.id},'${esNuevo ? 'en_preparacion' : 'listo'}')"`;
+    const pendKDS  = esNuevo ? lista.filter(x => x.estado === 'nuevo').length : 0;
     const items = (p.detalle_pedido || []).map(d => {
       const rondaBadge = (d.ronda > 1) ? `<span class="badge ba" style="font-size:10px;margin-left:4px;">R${d.ronda}</span>` : '';
       const notaItem   = d.nota ? `<div style="color:var(--am);font-size:11px;padding-left:24px;margin-top:2px;">→ ${d.nota}</div>` : '';
@@ -1290,12 +1296,17 @@ async function cargarKDS() {
         <div class="kds-items">${items}</div>
         ${p.notas ? `<div class="kds-notas">📝 ${p.notas}</div>` : ''}
         <div class="kds-action">
-          <button class="${btnClass}" style="width:100%;" onclick="avanzarEstado(${p.id},'${nextEst}')">
+          <button class="${btnClass}" style="width:100%;" ${nextAct}>
             ${btnLabel}
           </button>
         </div>
       </div>`;
   }).join('');
+}
+
+async function marcarEntregadoKDS(id, canal) {
+  await marcarEntregado(id, canal);
+  await cargarKDS();
 }
 
 async function avanzarEstado(id, nuevoEstado) {
