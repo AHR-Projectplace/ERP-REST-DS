@@ -1679,20 +1679,27 @@ async function cargarDashboard() {
     .order('created_at', { ascending: false });
   DASH_DATA = pedidos || [];
 
-  // 2. Detalle de pedidos activos (para top productos)
-  const ids = DASH_DATA.filter(p => p.estado !== 'cancelado').map(p => p.id);
-  if (ids.length > 0) {
+  // 2a. Detalles para ANALYTICS — solo pedidos activos (excluye cancelados de gráficas)
+  const idsActivos = DASH_DATA.filter(p => p.estado !== 'cancelado').map(p => p.id);
+  if (idsActivos.length > 0) {
     const { data: det } = await sb.from('detalle_pedido')
       .select('pedido_id, cantidad, precio_unitario, producto_id, productos(nombre, categoria_id, subcategoria_id)')
-      .in('pedido_id', ids);
+      .in('pedido_id', idsActivos);
     DASH_DETALLES = det || [];
   } else { DASH_DETALLES = []; }
-  // Construir mapa para accordion del historial
+
+  // 2b. Detalles para DISPLAY del historial — todos los pedidos incluido cancelados
+  const todosIds = DASH_DATA.map(p => p.id);
   detalleByPedido = {};
-  DASH_DETALLES.forEach(d => {
-    if (!detalleByPedido[d.pedido_id]) detalleByPedido[d.pedido_id] = [];
-    detalleByPedido[d.pedido_id].push(d);
-  });
+  if (todosIds.length > 0) {
+    const { data: detTodos } = await sb.from('detalle_pedido')
+      .select('pedido_id, cantidad, productos(nombre)')
+      .in('pedido_id', todosIds);
+    (detTodos || []).forEach(d => {
+      if (!detalleByPedido[d.pedido_id]) detalleByPedido[d.pedido_id] = [];
+      detalleByPedido[d.pedido_id].push(d);
+    });
+  }
 
   // 3. Gastos del período
   const fDesde = range.desde.split('T')[0];
