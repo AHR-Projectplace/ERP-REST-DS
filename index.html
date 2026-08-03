@@ -9,6 +9,7 @@
 <title>ERP Restaurante</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -265,7 +266,11 @@ tr:hover td{background:#FAFAF8;}
 .cat-admin-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--bd);}
 .cat-admin-row:last-child{border-bottom:none;}
 
-/* ── PRINT ──────────────────────────────────────────── */
+/* ── AGOTADO ────────────────────────────────────────── */
+.prod-btn.prod-agotado{opacity:.4;cursor:not-allowed;background:var(--s2);}
+.prod-btn.prod-agotado:hover{border-color:var(--bd2);background:var(--s2);transform:none;}
+.prod-btn.prod-agotado:active{transform:none;}
+</style>
 @media print {
   body > *:not(#print-area){display:none!important;}
   #print-area{display:block!important;font-family:'DM Sans',sans-serif;padding:20px;}
@@ -398,6 +403,7 @@ tr:hover td{background:#FAFAF8;}
       <div class="ps" style="margin-bottom:0;">Pedidos activos en tiempo real</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-sm" id="btn-audio" onclick="toggleAudio(this)" title="Activar notificación sonora">🔕 Sonido</button>
       <div class="kds-badge"><span class="kds-dot"></span><span id="kds-count">0 pendientes</span></div>
       <button class="btn btn-sm" onclick="cargarKDS()">↻ Actualizar</button>
     </div>
@@ -424,8 +430,6 @@ tr:hover td{background:#FAFAF8;}
     <table>
       <thead>
         <tr><th>Producto</th><th>Categoría</th><th>Subcategoría</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>
-      </thead>
-      <tbody id="menu-tbody"></tbody>
     </table>
   </div>
 
@@ -463,6 +467,7 @@ tr:hover td{background:#FAFAF8;}
     </select>
     <button class="btn btn-sm" id="btn-aplicar-recurrentes" onclick="aplicarRecurrentes()" style="display:none;">🔄 Aplicar recurrentes</button>
     <button class="btn btn-p btn-sm" onclick="abrirModalGasto()" style="margin-left:auto;">+ Registrar gasto</button>
+    <button class="btn btn-sm" onclick="exportarGastosExcel()">⬇ Excel</button>
   </div>
   <div id="gastos-recurrentes-banner" style="display:none;margin-bottom:12px;"></div>
 
@@ -620,7 +625,10 @@ tr:hover td{background:#FAFAF8;}
 
   <!-- Historial completo -->
   <div class="dash-section">
-    <div class="dash-section-title">🧾 Historial completo de pedidos</div>
+    <div class="dash-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>🧾 Historial completo de pedidos</span>
+      <button class="btn btn-sm" onclick="exportarVentasExcel()">⬇ Excel</button>
+    </div>
     <div class="tw">
       <div class="hist-filters">
         <select class="sel" id="hf-canal" onchange="renderHistorialCompleto()" style="font-size:12px;">
@@ -1040,6 +1048,17 @@ async function cargarCategorias() {
 async function cargarProductos() {
   const { data } = await sb.from('productos').select('*, categorias(nombre)').order('nombre');
   DB.productos = data || [];
+
+  // Auto-reset productos agotados de días anteriores
+  const hoy          = new Date().toISOString().split('T')[0];
+  const resetear     = DB.productos.filter(p => p.agotado && p.agotado_fecha && p.agotado_fecha < hoy);
+  if (resetear.length > 0) {
+    await sb.from('productos').update({ agotado: false, agotado_fecha: null })
+      .in('id', resetear.map(p => p.id));
+    const { data: fresh } = await sb.from('productos').select('*, categorias(nombre)').order('nombre');
+    DB.productos = fresh || [];
+  }
+
   renderProductos();
   renderProdGrid();
 }
@@ -1048,7 +1067,12 @@ async function cargarProductos() {
 function iniciarRealtime() {
   if (realtimeSub) return;
   realtimeSub = sb.channel('kds-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, (payload) => {
+      if (payload.new?.estado === 'nuevo') playBeep();
+      cargarKDS();
+      cargarHistorial();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => {
       cargarKDS();
       cargarHistorial();
     })
@@ -1116,12 +1140,18 @@ function renderProdGrid() {
   if (cajSubCatFiltro) lista = lista.filter(p => p.subcategoria_id === cajSubCatFiltro);
   const grid = document.getElementById('prod-grid');
   if (!lista.length) { grid.innerHTML = '<div class="empty">Sin productos en esta categoría</div>'; return; }
-  grid.innerHTML = lista.map(p => `
-    <button class="prod-btn" onclick="agregarItem(${p.id})">
-      <div class="prod-btn-name">${p.nombre}</div>
-      <div class="prod-btn-price">$${parseFloat(p.precio).toFixed(2)}</div>
-    </button>
-  `).join('');
+  grid.innerHTML = lista.map(p => {
+    if (p.agotado) return `
+      <button class="prod-btn prod-agotado" disabled>
+        <div class="prod-btn-name">${p.nombre}</div>
+        <div class="prod-btn-price" style="color:var(--t3);">⚠️ Agotado</div>
+      </button>`;
+    return `
+      <button class="prod-btn" onclick="agregarItem(${p.id})">
+        <div class="prod-btn-name">${p.nombre}</div>
+        <div class="prod-btn-price">$${parseFloat(p.precio).toFixed(2)}</div>
+      </button>`;
+  }).join('');
 }
 
 function agregarItem(prodId) {
@@ -1156,7 +1186,7 @@ function renderOrden() {
         <button class="qty-btn" onclick="cambiarCantidad(${i.producto_id},1)">+</button>
       </div>
       <div class="order-item-price">$${(i.precio * i.cantidad).toFixed(2)}</div>
-      <button class="nota-btn ${i.nota ? 'activa' : ''}" onclick="toggleNotaItem(${i.producto_id})" title="Agregar nota">📝</button>
+      <button class="nota-btn ${i.nota ? 'activa' : ''}" data-nota-btn="${i.producto_id}" onclick="toggleNotaItem(${i.producto_id})" title="Agregar nota">📝</button>
     </div>
     <div id="nota-item-${i.producto_id}" style="display:${i.nota ? 'block' : 'none'};" class="nota-item-wrap">
       <input class="nota-item-inp" placeholder="Ej. sin chile, extra limón..."
@@ -1418,7 +1448,9 @@ async function cargarKDS() {
     const pendKDS  = esNuevo ? lista.filter(x => x.estado === 'nuevo').length : 0;
     const items = (p.detalle_pedido || []).map(d => {
       const rondaBadge = (d.ronda > 1) ? `<span class="badge ba" style="font-size:10px;margin-left:4px;">R${d.ronda}</span>` : '';
-      const notaItem   = d.nota ? `<div style="color:var(--am);font-size:11px;padding-left:24px;margin-top:2px;">→ ${d.nota}</div>` : '';
+      const notaItem = d.nota
+        ? `<div style="background:var(--am2);border-left:3px solid var(--am);padding:3px 8px 3px 6px;margin:3px 0 3px 24px;font-size:12px;font-weight:500;color:var(--am);border-radius:0 4px 4px 0;">📝 ${d.nota}</div>`
+        : '';
       return `<div class="kds-item">
         <span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}${rondaBadge}
       </div>${notaItem}`;
@@ -1623,11 +1655,17 @@ function renderProductos() {
       <td>${p.categorias?.nombre || '—'}</td>
       <td>${subcat ? `<span class="badge bgr">${subcat.nombre}</span>` : '—'}</td>
       <td class="precio">$${parseFloat(p.precio).toFixed(2)}</td>
-      <td><span class="badge ${p.activo ? 'bg' : 'br'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td>
+        <span class="badge ${p.activo ? 'bg' : 'br'}">${p.activo ? 'Activo' : 'Inactivo'}</span>
+        ${p.agotado ? '<span class="badge ba" style="margin-left:4px;">⚠️ Agotado</span>' : ''}
+      </td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" onclick="abrirModalProducto(${p.id})">Editar</button>
         <button class="btn btn-sm ${p.activo ? 'btn-danger' : ''}" onclick="toggleActivo(${p.id},${p.activo})" style="margin-left:4px;">
           ${p.activo ? 'Desactivar' : 'Activar'}
+        </button>
+        <button class="btn btn-sm ${p.agotado ? 'btn-am' : ''}" onclick="toggleAgotado(${p.id},${p.agotado})" style="margin-left:4px;">
+          ${p.agotado ? '✓ Disponible' : '⚠️ Agotar'}
         </button>
       </td>
     </tr>`;
@@ -2117,13 +2155,13 @@ function toggleDetalle(id) {
 
 // ── NOTAS POR ÍTEM ────────────────────────────────────
 function toggleNotaItem(prodId) {
-  const el  = document.getElementById(`nota-item-${prodId}`);
-  const btn = el?.previousElementSibling?.querySelector('.nota-btn');
-  if (!el) return;
-  const visible = el.style.display !== 'none';
-  el.style.display = visible ? 'none' : 'block';
-  if (!visible) el.querySelector('input')?.focus();
-  renderOrden(); // re-render para actualizar clase activa del botón
+  const wrap = document.getElementById(`nota-item-${prodId}`);
+  const btn  = document.querySelector(`[data-nota-btn="${prodId}"]`);
+  if (!wrap) return;
+  const visible = wrap.style.display !== 'none';
+  wrap.style.display = visible ? 'none' : 'block';
+  if (btn) btn.classList.toggle('activa', !visible);
+  if (!visible) wrap.querySelector('input')?.focus();
 }
 
 function setItemNota(prodId, nota) {
@@ -2967,6 +3005,98 @@ function agregarSubcatRapido(catId) {
   if (sgCat) sgCat.value = catId;
   renderSubcatLista();
   document.getElementById('mov-subcat-gestion').classList.add('open');
+}
+
+// ── SONIDO ───────────────────────────────────────────
+let audioCtx    = null;
+let audioEnabled = false;
+
+function toggleAudio(el) {
+  audioEnabled = !audioEnabled;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume();
+  el.textContent = audioEnabled ? '🔔 Sonido ON' : '🔕 Sonido';
+  el.style.background = audioEnabled ? 'var(--gn2)' : '';
+  el.style.borderColor = audioEnabled ? 'var(--gn)' : '';
+  el.style.color = audioEnabled ? 'var(--gn)' : '';
+  if (audioEnabled) { playBeep(); toast('Notificación sonora activada ✓', 'ok'); }
+}
+
+function playBeep() {
+  if (!audioEnabled) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.15, 0.3].forEach(delay => {
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.12);
+      osc.start(audioCtx.currentTime + delay);
+      osc.stop(audioCtx.currentTime + delay + 0.12);
+    });
+  } catch(e) {}
+}
+
+// ── AGOTADO TEMPORAL ─────────────────────────────────
+async function toggleAgotado(id, agotado) {
+  const hoy  = new Date().toISOString().split('T')[0];
+  const payload = agotado
+    ? { agotado: false, agotado_fecha: null }
+    : { agotado: true,  agotado_fecha: hoy };
+  const { error } = await sb.from('productos').update(payload).eq('id', id);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  toast(agotado ? 'Producto disponible ✓' : '⚠️ Producto marcado como agotado', 'ok');
+  await cargarProductos();
+}
+
+// ── EXPORTAR EXCEL ────────────────────────────────────
+function exportarVentasExcel() {
+  if (!DASH_DATA?.length) { toast('No hay datos en el período actual', 'err'); return; }
+  const rows = DASH_DATA.map(p => ({
+    '#': p.id,
+    Fecha: new Date(p.created_at).toLocaleDateString('es-MX'),
+    Hora: new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+    Canal: p.canal,
+    Mesa: p.mesa || '—',
+    Comensales: p.comensales || '—',
+    Estado: p.estado,
+    Pago: p.pago_estado || '—',
+    'Método pago': p.metodo_pago || '—',
+    'Total ($)': parseFloat(p.total || 0)
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
+  const fecha = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `ventas_${fecha}.xlsx`);
+  toast('Reporte de ventas exportado ✓', 'ok');
+}
+
+async function exportarGastosExcel() {
+  const mes  = document.getElementById('gasto-mes')?.value;
+  if (!mes) { toast('Selecciona un mes primero', 'err'); return; }
+  const [anio, m] = mes.split('-');
+  const inicio = `${anio}-${m}-01`;
+  const fin    = new Date(anio, parseInt(m), 0).toISOString().split('T')[0];
+  const { data } = await sb.from('gastos').select('*')
+    .gte('fecha', inicio).lte('fecha', fin).eq('erased', false).order('fecha');
+  if (!data?.length) { toast('Sin gastos en este período', 'err'); return; }
+  const rows = data.map(g => ({
+    Descripción: g.descripcion,
+    Tipo: g.tipo,
+    Categoría: g.categoria || '—',
+    'Monto ($)': parseFloat(g.monto || 0),
+    Fecha: g.fecha,
+    Recurrente: g.recurrente ? 'Sí' : 'No'
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
+  XLSX.writeFile(wb, `gastos_${mes}.xlsx`);
+  toast('Reporte de gastos exportado ✓', 'ok');
 }
 
 // ── TOAST ─────────────────────────────────────────────
