@@ -254,6 +254,24 @@ tr:hover td{background:#FAFAF8;}
 .detail-cell{padding:10px 16px 10px 32px;font-size:12px;color:var(--t2);}
 .detail-items{display:flex;gap:8px;flex-wrap:wrap;}
 .detail-tag{background:var(--surface);border:1px solid var(--bd);border-radius:6px;padding:3px 8px;font-size:11px;}
+
+/* ── COBRO ─────────────────────────────────────────── */
+.cobro-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px 16px;border-radius:12px;border:2px solid;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;min-height:90px;width:100%;}
+.cobro-btn:hover{transform:scale(1.03);}
+.cobro-ef{background:var(--gn2);border-color:var(--gn);color:var(--gn);}
+.cobro-td{background:var(--pu2);border-color:var(--pu);color:var(--pu);}
+
+/* ── CATEGORÍAS ADMIN ──────────────────────────────── */
+.cat-admin-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--bd);}
+.cat-admin-row:last-child{border-bottom:none;}
+
+/* ── PRINT ──────────────────────────────────────────── */
+@media print {
+  body > *:not(#print-area){display:none!important;}
+  #print-area{display:block!important;font-family:'DM Sans',sans-serif;padding:20px;}
+  #print-area .no-print{display:none!important;}
+}
+#print-area{display:none;}
 </style>
 </head>
 <body>
@@ -355,7 +373,10 @@ tr:hover td{background:#FAFAF8;}
     <div class="tw">
       <div class="th2">
         <span class="tt">Pedidos del día</span>
-        <button class="btn btn-sm" onclick="cargarHistorial()">↻ Actualizar</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="abrirCierreDia()" id="btn-cierre" style="display:none;">🖨 Cierre del día</button>
+          <button class="btn btn-sm" onclick="cargarHistorial()">↻ Actualizar</button>
+        </div>
       </div>
       <div style="overflow-x:auto;">
         <table>
@@ -409,7 +430,18 @@ tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
-<!-- ── GASTOS ────────────────────────────────────────── -->
+  <!-- Gestión de categorías (solo admin) -->
+  <div class="tw" id="cat-admin-section" style="margin-top:20px;display:none;">
+    <div class="th2">
+      <span class="tt">Categorías</span>
+    </div>
+    <div style="padding:16px;" id="cat-admin-lista"></div>
+    <div style="padding:12px 16px;border-top:1px solid var(--bd);display:flex;gap:8px;">
+      <input class="inp" id="nueva-cat-nombre" placeholder="Nueva categoría..." style="flex:1;">
+      <button class="btn btn-p btn-sm" onclick="guardarCategoria()">+ Agregar</button>
+    </div>
+  </div>
+</div>
 <div class="vw" id="vw-gastos">
   <div class="pt">Gastos</div>
   <div class="ps">Control de gastos fijos y variables</div>
@@ -662,6 +694,34 @@ tr:hover td{background:#FAFAF8;}
 </div>
 
 </div><!-- /app -->
+
+<!-- ── MODAL COBRO ───────────────────────────────────── -->
+<div class="mov" id="mov-cobro">
+  <div class="mo mo-sm">
+    <div class="moh">
+      <div class="mot">💳 Registrar pago</div>
+      <button class="mox" onclick="cerrarModalCobro()">✕</button>
+    </div>
+    <div class="mob">
+      <input type="hidden" id="cobro-pedido-id">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:12px;color:var(--t2);margin-bottom:4px;">Total a cobrar</div>
+        <div style="font-size:36px;font-weight:700;font-family:'DM Mono',monospace;color:var(--acc);" id="cobro-total">$0.00</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <button class="cobro-btn cobro-ef" onclick="confirmarCobro('efectivo')">
+          <span style="font-size:28px;">💵</span>Efectivo
+        </button>
+        <button class="cobro-btn cobro-td" onclick="confirmarCobro('tarjeta')">
+          <span style="font-size:28px;">💳</span>Tarjeta / TDC
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ÁREA DE IMPRESIÓN ─────────────────────────────── -->
+<div id="print-area"></div>
 
 <!-- ── MODAL USUARIO ─────────────────────────────────── -->
 <div class="mov" id="mov-usuario">
@@ -916,6 +976,11 @@ async function initApp() {
   if (rol === 'admin') {
     ['pedidos','cocina','menu','gastos','dashboard','usuarios'].forEach(t =>
       document.getElementById('nb-' + t).style.display = '');
+    // Mostrar controles exclusivos admin
+    const btnCierre = document.getElementById('btn-cierre');
+    if (btnCierre) btnCierre.style.display = '';
+    const catSection = document.getElementById('cat-admin-section');
+    if (catSection) catSection.style.display = '';
     sv('pedidos');
   } else if (rol === 'caja') {
     document.getElementById('nb-pedidos').style.display = '';
@@ -960,6 +1025,7 @@ async function cargarCategorias() {
   renderCatChips();
   renderCatSelect();
   renderCajaCatChips();
+  if (SESSION?.rol === 'admin') renderCategoriasAdmin();
   // Poblar select de gestión de subcategorías
   const sgCat = document.getElementById('sg-cat');
   if (sgCat) {
@@ -1189,9 +1255,12 @@ async function cargarHistorial() {
 
   tbody.innerHTML = activos.map(p => {
     const esAdmin = SESSION?.rol === 'admin';
+    const metodoBadge = p.metodo_pago
+      ? `<span class="badge ${p.metodo_pago === 'efectivo' ? 'bg' : 'bpu'}" style="font-size:10px;margin-left:4px;">${p.metodo_pago === 'efectivo' ? '💵' : '💳'}</span>`
+      : '';
     const pagoCell = p.pago_estado
-      ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>
-         ${p.pago_estado === 'por_pagar' ? `<br><button class="btn btn-sm btn-gn" onclick="marcarPagado(${p.id})" style="margin-top:4px;">Cobrar</button>` : ''}`
+      ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>${metodoBadge}
+         ${p.pago_estado === 'por_pagar' ? `<br><button class="btn btn-sm btn-gn" onclick="abrirModalCobro(${p.id},${p.total})" style="margin-top:4px;">Cobrar</button>` : ''}`
       : '—';
 
     const accionEntrega = p.estado === 'listo'
@@ -1288,11 +1357,11 @@ async function marcarEntregado(id, canal) {
   await cargarHistorial();
 }
 
-async function marcarPagado(id) {
+async function marcarPagado(id, metodo = 'efectivo') {
   const { error } = await sb.from('pedidos')
-    .update({ pago_estado: 'pagado' }).eq('id', id);
+    .update({ pago_estado: 'pagado', metodo_pago: metodo }).eq('id', id);
   if (error) { toast('Error: ' + error.message, 'err'); return; }
-  toast('Pago registrado ✓', 'ok');
+  toast(`Pago registrado — ${metodo === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta'} ✓`, 'ok');
   await cargarHistorial();
 }
 
@@ -2747,6 +2816,155 @@ function renderProductosSinMovimiento() {
       <span class="badge br">Sin ventas</span>
     </div>`;
   }).join('');
+}
+
+// ── MODAL COBRO ───────────────────────────────────────
+function abrirModalCobro(id, total) {
+  document.getElementById('cobro-pedido-id').value = id;
+  document.getElementById('cobro-total').textContent = '$' + parseFloat(total).toFixed(2);
+  document.getElementById('mov-cobro').classList.add('open');
+}
+function cerrarModalCobro() {
+  document.getElementById('mov-cobro').classList.remove('open');
+}
+async function confirmarCobro(metodo) {
+  const id = document.getElementById('cobro-pedido-id').value;
+  cerrarModalCobro();
+  await marcarPagado(parseInt(id), metodo);
+}
+
+// ── CIERRE DE CAJA ────────────────────────────────────
+async function abrirCierreDia() {
+  const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await sb.from('pedidos').select('*')
+    .gte('created_at', hace24h).order('created_at', { ascending: true });
+  const lista     = data || [];
+  const activos   = lista.filter(p => p.estado !== 'cancelado');
+  const entregados = activos.filter(p => p.estado === 'entregado');
+  const total     = activos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
+  const efectivo  = activos.filter(p => p.metodo_pago === 'efectivo').reduce((s,p) => s + parseFloat(p.total||0), 0);
+  const tarjeta   = activos.filter(p => p.metodo_pago === 'tarjeta').reduce((s,p) => s + parseFloat(p.total||0), 0);
+  const porCobrar = activos.filter(p => p.pago_estado === 'por_pagar').reduce((s,p) => s + parseFloat(p.total||0), 0);
+  const ticket    = activos.length ? total / activos.length : 0;
+  const fechaStr  = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const fmt = n => '$' + parseFloat(n).toLocaleString('es-MX', { minimumFractionDigits: 2 });
+
+  const filas = activos.map(p => `
+    <tr>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">#${p.id}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">${p.canal === 'mesa' ? `Mesa ${p.mesa}` : p.canal}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">${p.estado}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">${p.metodo_pago ? (p.metodo_pago === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta') : '—'}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;text-align:right;font-family:monospace;">${fmt(p.total)}</td>
+    </tr>`).join('');
+
+  const html = `
+    <div style="max-width:600px;margin:0 auto;padding:20px;font-family:'DM Sans',sans-serif;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:22px;font-weight:700;color:#C0521A;">🍽️ ERP Restaurante</div>
+        <div style="font-size:13px;color:#6B6860;margin-top:4px;">Cierre del día — ${fechaStr}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div style="background:#F5F4F0;border-radius:8px;padding:12px 16px;">
+          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">Total ventas</div>
+          <div style="font-size:24px;font-weight:700;font-family:monospace;color:#C0521A;">${fmt(total)}</div>
+        </div>
+        <div style="background:#F5F4F0;border-radius:8px;padding:12px 16px;">
+          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">Ticket promedio</div>
+          <div style="font-size:24px;font-weight:700;font-family:monospace;">${fmt(ticket)}</div>
+        </div>
+        <div style="background:#E8F5EE;border-radius:8px;padding:12px 16px;">
+          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">💵 Efectivo</div>
+          <div style="font-size:20px;font-weight:700;font-family:monospace;color:#1A7A52;">${fmt(efectivo)}</div>
+        </div>
+        <div style="background:#F0EAFA;border-radius:8px;padding:12px 16px;">
+          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">💳 Tarjeta / TDC</div>
+          <div style="font-size:20px;font-weight:700;font-family:monospace;color:#4A2A8A;">${fmt(tarjeta)}</div>
+        </div>
+      </div>
+      ${porCobrar > 0 ? `<div style="background:#FDF3DC;border:1px solid #8A5C00;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;">⚠️ Por cobrar: <strong>${fmt(porCobrar)}</strong></div>` : ''}
+      <div style="font-size:12px;color:#6B6860;margin-bottom:8px;font-weight:600;">${activos.length} pedidos activos del día</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#EFEDE8;">
+          <th style="padding:6px 8px;text-align:left;">#</th>
+          <th style="padding:6px 8px;text-align:left;">Mesa/Canal</th>
+          <th style="padding:6px 8px;text-align:left;">Estado</th>
+          <th style="padding:6px 8px;text-align:left;">Método</th>
+          <th style="padding:6px 8px;text-align:right;">Total</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+      <div class="no-print" style="margin-top:24px;text-align:center;">
+        <button onclick="window.print()" style="padding:10px 24px;background:#C0521A;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;">🖨 Imprimir</button>
+        <button onclick="window.close()" style="margin-left:12px;padding:10px 24px;background:#EFEDE8;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;">Cerrar</button>
+      </div>
+    </div>`;
+
+  const ventana = window.open('', '_blank', 'width=700,height=800');
+  ventana.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cierre del día</title>
+    <style>body{margin:0;background:#fff;} @media print{.no-print{display:none!important;}}</style>
+    </head><body>${html}</body></html>`);
+  ventana.document.close();
+}
+
+// ── CATEGORÍAS ADMIN ─────────────────────────────────
+async function renderCategoriasAdmin() {
+  const cont = document.getElementById('cat-admin-lista');
+  if (!cont) return;
+  if (!DB.categorias.length) { cont.innerHTML = '<div class="empty">Sin categorías</div>'; return; }
+
+  cont.innerHTML = DB.categorias.map(c => {
+    const subs = DB.subcategorias.filter(s => s.categoria_id === c.id);
+    const subChips = subs.length
+      ? subs.map(s => `<span class="badge bgr" style="font-size:11px;">${s.nombre} <button onclick="borrarSubcat(${s.id},'${s.nombre.replace(/'/g,"\\'")}') " style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:10px;padding:0 2px;">✕</button></span>`).join(' ')
+      : '<span style="font-size:11px;color:var(--t3);">Sin subcategorías</span>';
+    return `
+      <div class="cat-admin-row">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;">${c.nombre}</div>
+          <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${subChips}</div>
+        </div>
+        <button class="btn btn-sm" onclick="agregarSubcatRapido(${c.id})" title="Agregar subcategoría">+ Sub</button>
+        <button class="btn btn-sm btn-danger" onclick="borrarCategoriaAdmin(${c.id},'${c.nombre.replace(/'/g,"\\'")}')">✕</button>
+      </div>`;
+  }).join('');
+}
+
+async function guardarCategoria() {
+  const nombre = document.getElementById('nueva-cat-nombre')?.value.trim();
+  if (!nombre) { toast('Ingresa el nombre de la categoría', 'err'); return; }
+  const orden = DB.categorias.length + 1;
+  const { error } = await sb.from('categorias').insert({ nombre, orden });
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  document.getElementById('nueva-cat-nombre').value = '';
+  toast('Categoría agregada ✓', 'ok');
+  await cargarCategorias();
+  renderCategoriasAdmin();
+}
+
+function borrarCategoriaAdmin(id, nombre) {
+  abrirConfirm(
+    `¿Eliminar la categoría "${nombre}"? Los productos de esta categoría quedarán sin categoría.`,
+    async () => {
+      await sb.from('productos').update({ categoria_id: null }).eq('categoria_id', id);
+      await sb.from('subcategorias').delete().eq('categoria_id', id);
+      const { error } = await sb.from('categorias').delete().eq('id', id);
+      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      toast('Categoría eliminada', 'ok');
+      await cargarCategorias();
+      await cargarProductos();
+      renderCategoriasAdmin();
+    },
+    'Sí, eliminar'
+  );
+}
+
+function agregarSubcatRapido(catId) {
+  const sgCat = document.getElementById('sg-cat');
+  if (sgCat) sgCat.value = catId;
+  renderSubcatLista();
+  document.getElementById('mov-subcat-gestion').classList.add('open');
 }
 
 // ── TOAST ─────────────────────────────────────────────
