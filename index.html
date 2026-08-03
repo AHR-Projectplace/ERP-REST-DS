@@ -1297,21 +1297,18 @@ async function marcarPagado(id) {
 }
 
 function cancelarPedido(id) {
-  abrirConfirm(
-    `¿Cancelar el pedido #${id}? Desaparecerá del historial del día y no sumará en los reportes.`,
-    async () => {
-      const { data, error } = await sb.from('pedidos')
-        .update({ estado: 'cancelado', updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select('id');
-      if (error) { toast('Error al cancelar: ' + error.message, 'err'); return; }
-      if (!data?.length) { toast('No se pudo cancelar el pedido. Verifica permisos.', 'err'); return; }
-      await logAction('pedido_cancelado', 'pedidos', id, `Pedido #${id} cancelado`);
-      toast(`✓ Pedido #${id} cancelado y removido del historial`, 'ok');
-      await cargarHistorial();
-    },
-    'Sí, cancelar'
-  );
+  if (!confirm(`¿Cancelar el pedido #${id}?\n\nEl pedido desaparecerá del historial del día y no sumará en reportes.`)) return;
+  (async () => {
+    const { data, error } = await sb.from('pedidos')
+      .update({ estado: 'cancelado', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id');
+    if (error) { toast('Error: ' + error.message, 'err'); return; }
+    if (!data?.length) { toast('No se pudo cancelar — sin permisos o ID inválido', 'err'); return; }
+    await logAction('pedido_cancelado', 'pedidos', id, `Pedido #${id} cancelado`);
+    toast(`✓ Pedido #${id} cancelado`, 'ok');
+    await cargarHistorial();
+  })();
 }
 
 // ── KDS — COCINA ──────────────────────────────────────
