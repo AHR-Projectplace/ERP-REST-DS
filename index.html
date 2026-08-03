@@ -1178,7 +1178,8 @@ async function cargarHistorial() {
   }
 
   const lista = data || [];
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos en las últimas 24 horas</td></tr>'; return; }
+  const activos = lista.filter(p => p.estado !== 'cancelado');
+  if (!activos.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos activos en las últimas 24 horas</td></tr>'; return; }
 
   const estadoLabel  = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
   const estadoBadge  = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
@@ -1186,7 +1187,7 @@ async function cargarHistorial() {
   const pagoLabel    = { por_pagar:'Por pagar', pagado:'Pagado' };
   const pagoBadge    = { por_pagar:'ba', pagado:'bg' };
 
-  tbody.innerHTML = lista.map(p => {
+  tbody.innerHTML = activos.map(p => {
     const esAdmin = SESSION?.rol === 'admin';
     const pagoCell = p.pago_estado
       ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>
@@ -1297,13 +1298,16 @@ async function marcarPagado(id) {
 
 function cancelarPedido(id) {
   abrirConfirm(
-    `¿Seguro que deseas cancelar el pedido #${id}? Esta acción no se puede deshacer.`,
+    `¿Cancelar el pedido #${id}? Desaparecerá del historial del día y no sumará en los reportes.`,
     async () => {
-      const { error } = await sb.from('pedidos')
-        .update({ estado: 'cancelado', updated_at: new Date().toISOString() }).eq('id', id);
-      if (error) { toast('Error: ' + error.message, 'err'); return; }
+      const { data, error } = await sb.from('pedidos')
+        .update({ estado: 'cancelado', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id');
+      if (error) { toast('Error al cancelar: ' + error.message, 'err'); return; }
+      if (!data?.length) { toast('No se pudo cancelar el pedido. Verifica permisos.', 'err'); return; }
       await logAction('pedido_cancelado', 'pedidos', id, `Pedido #${id} cancelado`);
-      toast(`Pedido #${id} cancelado`, 'ok');
+      toast(`✓ Pedido #${id} cancelado y removido del historial`, 'ok');
       await cargarHistorial();
     },
     'Sí, cancelar'
@@ -1792,8 +1796,9 @@ function renderHistorialCompleto() {
     const detHTML  = detalles.length
       ? detalles.map(d => `<span class="detail-tag">${d.cantidad}× ${d.productos?.nombre || '?'}</span>`).join('')
       : '<span style="color:var(--t3);">Sin detalle</span>';
+    const canceladoStyle = p.estado === 'cancelado' ? 'opacity:.55;background:var(--bg);' : '';
     return `
-      <tr>
+      <tr style="${canceladoStyle}">
         <td class="precio">#${p.id}</td>
         <td style="font-size:12px;">${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'})}</td>
         <td style="font-size:12px;color:var(--t2);">${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
