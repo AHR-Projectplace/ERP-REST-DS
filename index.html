@@ -428,7 +428,6 @@ tr:hover td{background:#FAFAF8;}
       <tbody id="menu-tbody"></tbody>
     </table>
   </div>
-</div>
 
   <!-- Gestión de categorías (solo admin) -->
   <div class="tw" id="cat-admin-section" style="margin-top:20px;display:none;">
@@ -442,6 +441,7 @@ tr:hover td{background:#FAFAF8;}
     </div>
   </div>
 </div>
+
 <div class="vw" id="vw-gastos">
   <div class="pt">Gastos</div>
   <div class="ps">Control de gastos fijos y variables</div>
@@ -1229,12 +1229,13 @@ async function cargarHistorial() {
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--t3);font-size:13px;">Cargando...</td></tr>';
 
-  // Últimas 24h — evita cualquier problema de timezone
-  const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  // Medianoche local → evita mostrar pedidos de ayer
+  const ahora     = new Date();
+  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
 
   const { data, error } = await sb.from('pedidos')
     .select('*')
-    .gte('created_at', hace24h)
+    .gte('created_at', inicioDia.toISOString())
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -2835,9 +2836,10 @@ async function confirmarCobro(metodo) {
 
 // ── CIERRE DE CAJA ────────────────────────────────────
 async function abrirCierreDia() {
-  const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const ahora     = new Date();
+  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
   const { data } = await sb.from('pedidos').select('*')
-    .gte('created_at', hace24h).order('created_at', { ascending: true });
+    .gte('created_at', inicioDia.toISOString()).order('created_at', { ascending: true });
   const lista     = data || [];
   const activos   = lista.filter(p => p.estado !== 'cancelado');
   const entregados = activos.filter(p => p.estado === 'entregado');
