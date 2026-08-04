@@ -270,6 +270,8 @@ tr:hover td{background:#FAFAF8;}
 .prod-btn.prod-agotado{opacity:.4;cursor:not-allowed;background:var(--s2);}
 .prod-btn.prod-agotado:hover{border-color:var(--bd2);background:var(--s2);transform:none;}
 .prod-btn.prod-agotado:active{transform:none;}
+.com-btn.ocupada{border-color:var(--am);background:var(--am2);color:var(--am);}
+.com-btn.ocupada.active{border-color:var(--acc);background:var(--acc);color:#fff;}
 
 /* ── PRINT ──────────────────────────────────────────── */
 @media print {
@@ -706,6 +708,21 @@ tr:hover td{background:#FAFAF8;}
 
 </div><!-- /app -->
 
+<!-- ── MODAL CAMBIAR MESA ─────────────────────────────── -->
+<div class="mov" id="mov-cambiar-mesa">
+  <div class="mo mo-sm">
+    <div class="moh">
+      <div class="mot">↔️ Cambiar mesa</div>
+      <button class="mox" onclick="cerrarCambiarMesa()">✕</button>
+    </div>
+    <div class="mob">
+      <input type="hidden" id="cambio-pedido-id">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:12px;">Selecciona la nueva mesa <span style="color:var(--am);">⚠️ = ocupada</span></div>
+      <div class="comensales-grid" id="cambio-mesa-grid"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ── MODAL COBRO ───────────────────────────────────── -->
 <div class="mov" id="mov-cobro">
   <div class="mo mo-sm">
@@ -1012,7 +1029,7 @@ async function initApp() {
   await cargarKDS();
   await cargarGastos();
   if (SESSION.rol === 'admin') await cargarDashboard();
-  renderMesaGrid();
+  await renderMesaGrid();
   renderComensalesGrid();
   iniciarRealtime();
 }
@@ -1083,14 +1100,14 @@ function iniciarRealtime() {
 }
 
 // ── PEDIDOS — CAJA ────────────────────────────────────
-function setCanal(canal, el) {
+async function setCanal(canal, el) {
   PEDIDO.canal = canal;
   document.querySelectorAll('.canal-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   const mesaWrap = document.getElementById('mesa-wrap');
   if (mesaWrap) mesaWrap.style.display = canal === 'mesa' ? 'block' : 'none';
   if (canal !== 'mesa') { PEDIDO.mesa = ''; PEDIDO.mesaNum = null; comensalesActual = 1; }
-  if (canal === 'mesa') { renderMesaGrid(); renderComensalesGrid(); }
+  if (canal === 'mesa') { await renderMesaGrid(); renderComensalesGrid(); }
 }
 
 function actualizarMesa() {
@@ -1231,6 +1248,22 @@ async function enviarPedido() {
   if (PEDIDO.canal === 'mesa' && !PEDIDO.mesaNum) {
     toast('Selecciona el número de mesa', 'err'); return;
   }
+
+  // Capa 2: validar mesa no duplicada
+  if (PEDIDO.canal === 'mesa') {
+    const ocupado = await verificarMesaOcupada(PEDIDO.mesaNum);
+    if (ocupado) {
+      const irRonda = confirm(`⚠️ Mesa ${PEDIDO.mesaNum} ya tiene el pedido #${ocupado.id} activo.\n\nOK → Agregar como ronda a ese pedido\nCancelar → Crear pedido nuevo de todas formas`);
+      if (irRonda) {
+        const { data: dets } = await sb.from('detalle_pedido').select('ronda').eq('pedido_id', ocupado.id);
+        const maxRonda = Math.max(...(dets || []).map(d => d.ronda || 1), 1);
+        RONDA = { pedidoId: ocupado.id, mesa: String(PEDIDO.mesaNum), rondaNum: maxRonda + 1, totalAnterior: parseFloat(ocupado.total || 0) };
+        await enviarPedido();
+        return;
+      }
+    }
+  }
+
   const total = PEDIDO.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const notas = document.getElementById('order-notas').value.trim();
   const mesa  = PEDIDO.canal === 'mesa' ? String(PEDIDO.mesaNum) : null;
@@ -1305,6 +1338,9 @@ async function cargarHistorial() {
 
     const puedeRonda = p.canal === 'mesa' && p.estado !== 'cancelado' && p.pago_estado !== 'pagado';
     const btnRonda   = puedeRonda ? `<button class="btn btn-sm" onclick="activarModoRonda(${p.id},'${p.mesa || ''}',${p.total})" style="margin-left:4px;" title="Agregar ronda">➕</button>` : '';
+    const btnMesa    = p.canal === 'mesa' && p.estado !== 'cancelado' && esAdmin
+      ? `<button class="btn btn-sm" onclick="abrirCambiarMesa(${p.id})" style="margin-left:4px;" title="Cambiar mesa">↔️</button>`
+      : '';
 
     const accionAdmin = esAdmin && p.estado !== 'cancelado'
       ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" style="margin-left:4px;">Cancelar</button>`
@@ -1321,7 +1357,7 @@ async function cargarHistorial() {
         <td style="font-size:12px;color:var(--t2);">${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
         <td style="white-space:nowrap;display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
           <button class="btn btn-sm" onclick="verItemsPedido(${p.id})" title="Ver ítems del pedido" style="font-size:14px;padding:4px 8px;">📋</button>
-          ${accionEntrega}${btnRonda}${accionAdmin}
+          ${accionEntrega}${btnRonda}${btnMesa}${accionAdmin}
         </td>
       </tr>
       <tr class="detail-row" id="det-row-${p.id}">
@@ -2118,13 +2154,26 @@ function renderAnalisisGastos() {
 }
 
 // ── COMENSALES ────────────────────────────────────────
-function renderMesaGrid() {
-  const grid = document.getElementById('mesa-grid');
+async function renderMesaGrid(gridId = 'mesa-grid') {
+  const grid = document.getElementById(gridId);
   if (!grid) return;
-  grid.innerHTML = Array.from({length:10}, (_,i) => i+1).map(n => `
-    <button class="com-btn ${PEDIDO.mesaNum === n ? 'active' : ''}"
-      onclick="selMesa(${n},this)">${n}</button>
-  `).join('');
+
+  // Cargar mesas con pedidos activos hoy
+  const ahora     = new Date();
+  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+  const { data: activos } = await sb.from('pedidos')
+    .select('mesa').not('estado', 'in', '(cancelado,entregado)')
+    .gte('created_at', inicioDia.toISOString());
+  const ocupadas = new Set((activos || []).map(p => p.mesa).filter(Boolean));
+
+  const esCambio = gridId === 'cambio-mesa-grid';
+  grid.innerHTML = Array.from({length:10}, (_,i) => i+1).map(n => {
+    const esActiva  = !esCambio && PEDIDO.mesaNum === n;
+    const esOcupada = ocupadas.has(String(n));
+    const cls       = esActiva ? 'active' : esOcupada ? 'ocupada' : '';
+    const fn        = esCambio ? `confirmarCambiarMesa(${n})` : `selMesa(${n},this)`;
+    return `<button class="com-btn ${cls}" onclick="${fn}" title="${esOcupada ? '⚠️ Mesa ocupada' : 'Mesa '+n}">${n}${esOcupada ? '⚠' : ''}</button>`;
+  }).join('');
 }
 
 function selMesa(n, el) {
@@ -3100,6 +3149,93 @@ async function exportarGastosExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
   XLSX.writeFile(wb, `gastos_${mes}.xlsx`);
   toast('Reporte de gastos exportado ✓', 'ok');
+}
+
+// ── VALIDACIÓN MESA DUPLICADA ─────────────────────────
+async function verificarMesaOcupada(mesaNum) {
+  if (!mesaNum) return null;
+  const ahora     = new Date();
+  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+  const { data } = await sb.from('pedidos')
+    .select('id, total, estado')
+    .eq('mesa', String(mesaNum))
+    .not('estado', 'in', '(cancelado,entregado)')
+    .gte('created_at', inicioDia.toISOString())
+    .limit(1);
+  return data?.length ? data[0] : null;
+}
+
+// ── CAMBIAR MESA ──────────────────────────────────────
+async function abrirCambiarMesa(pedidoId) {
+  document.getElementById('cambio-pedido-id').value = pedidoId;
+  document.getElementById('mov-cambiar-mesa').classList.add('open');
+  await renderMesaGrid('cambio-mesa-grid');
+}
+function cerrarCambiarMesa() {
+  document.getElementById('mov-cambiar-mesa').classList.remove('open');
+}
+async function confirmarCambiarMesa(nuevaMesa) {
+  const id = document.getElementById('cambio-pedido-id').value;
+  // Verificar que la nueva mesa no esté ocupada por otro pedido
+  const ocupado = await verificarMesaOcupada(nuevaMesa);
+  if (ocupado && String(ocupado.id) !== String(id)) {
+    if (!confirm(`⚠️ Mesa ${nuevaMesa} ya tiene el pedido #${ocupado.id} activo.\n¿Deseas moverlo de todas formas?`)) return;
+  }
+  const { error } = await sb.from('pedidos').update({ mesa: String(nuevaMesa) }).eq('id', id);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  cerrarCambiarMesa();
+  toast(`Pedido #${id} movido a Mesa ${nuevaMesa} ✓`, 'ok');
+  await cargarHistorial();
+  await renderMesaGrid();
+}
+
+// ── QA DIAGNÓSTICO ────────────────────────────────────
+async function runQA() {
+  const res = [];
+  const ok  = (test, pass, msg = '') => res.push({ test, pass, msg: pass ? '✅ OK' : '❌ ' + msg });
+
+  // 1. Conexión Supabase
+  const { error: connErr } = await sb.from('pedidos').select('id').limit(1);
+  ok('Conexión Supabase', !connErr, connErr?.message);
+
+  // 2. Columnas pedidos
+  const { data: ped } = await sb.from('pedidos').select('*').limit(1);
+  if (ped?.length) {
+    ['metodo_pago','comensales','mesa','pago_estado'].forEach(c =>
+      ok(`pedidos.${c}`, c in ped[0], 'columna no existe — ejecutar SQL')
+    );
+  } else { ok('pedidos (datos)', false, 'tabla vacía — crear un pedido de prueba'); }
+
+  // 3. Columnas detalle_pedido
+  const { data: det } = await sb.from('detalle_pedido').select('*').limit(1);
+  if (det?.length) {
+    ['ronda','nota'].forEach(c =>
+      ok(`detalle_pedido.${c}`, c in det[0], 'columna no existe — ejecutar SQL')
+    );
+  } else { ok('detalle_pedido (datos)', false, 'tabla vacía'); }
+
+  // 4. Columnas productos
+  const { data: prod } = await sb.from('productos').select('*').limit(1);
+  if (prod?.length) {
+    ['agotado','agotado_fecha'].forEach(c =>
+      ok(`productos.${c}`, c in prod[0], 'columna no existe — ejecutar SQL')
+    );
+  }
+
+  // 5. Realtime activo
+  ok('Realtime suscripción', !!realtimeSub, 'no conectado — recargar página');
+
+  // 6. Funciones críticas
+  ['verificarMesaOcupada','activarModoRonda','marcarPagado','toggleAgotado'].forEach(fn =>
+    ok(`Función ${fn}`, typeof window[fn] === 'function', 'no definida')
+  );
+
+  // Reporte
+  const total  = res.length;
+  const passed = res.filter(r => r.pass).length;
+  const reporte = res.map(r => `${r.pass ? '✅' : '❌'} ${r.test}: ${r.msg}`).join('\n');
+  console.log(`=== QA REPORT (${passed}/${total}) ===\n${reporte}`);
+  alert(`QA — ${passed}/${total} pruebas OK\n\n${reporte}`);
 }
 
 // ── TOAST ─────────────────────────────────────────────
