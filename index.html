@@ -3378,6 +3378,13 @@ function toast(msg, tipo = '') {
 
 // ── BOOT ──────────────────────────────────────────────
 (async function boot() {
+  // 1. Restaurar sesión existente al recargar la página
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user && !SESSION) {
+    await initSession(session.user.id);
+  }
+
+  // 2. Escuchar cambios futuros de autenticación
   sb.auth.onAuthStateChange(async (event, session) => {
     if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
       if (!SESSION) {
@@ -3386,6 +3393,3 @@ function toast(msg, tipo = '') {
     }
   });
 })();
-</script>
-</body>
-</html>
