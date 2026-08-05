@@ -282,8 +282,10 @@ tr:hover td{background:#FAFAF8;}
 .hist-card-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
 .hist-mesa{font-size:24px;font-weight:700;color:var(--acc);line-height:1.1;}
 .hist-card-actions{display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--bd);flex-wrap:wrap;align-items:center;}
-.hist-card .detail-row.open{display:block;}
-.hist-card .detail-cell{padding:8px 14px;font-size:12px;color:var(--t2);}
+.hist-card-cobrado{opacity:.55;}
+.hist-card-cobrado .hist-mesa{font-size:17px;color:var(--t2);}
+.hist-section-title{grid-column:1/-1;padding:8px 4px 4px;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px;}
+.hist-section-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
 
 /* ── MENÚ TOGGLE ─────────────────────────────────── */
 .menu-toggle-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
@@ -763,6 +765,19 @@ tr:hover td{background:#FAFAF8;}
       <input type="hidden" id="cambio-pedido-id">
       <div style="font-size:12px;color:var(--t2);margin-bottom:12px;">Selecciona la nueva mesa <span style="color:var(--am);">⚠️ = ocupada</span></div>
       <div class="comensales-grid" id="cambio-mesa-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL RESUMEN DEL DÍA ──────────────────────────── -->
+<div class="mov" id="mov-resumen">
+  <div class="mo" style="max-width:540px;">
+    <div class="moh">
+      <div class="mot">📊 Resumen del día</div>
+      <button class="mox" onclick="document.getElementById('mov-resumen').classList.remove('open')">✕</button>
+    </div>
+    <div class="mob" id="resumen-contenido" style="padding:16px;">
+      <div class="empty">Cargando...</div>
     </div>
   </div>
 </div>
@@ -1385,17 +1400,19 @@ async function cargarHistorial() {
     return;
   }
 
-  const lista   = (data || []).filter(p => p.estado !== 'cancelado');
-  if (!lista.length) { cont.innerHTML = '<div class="empty" style="padding:32px;grid-column:1/-1;">Sin pedidos activos hoy</div>'; return; }
+  const lista    = (data || []).filter(p => p.estado !== 'cancelado');
+  if (!lista.length) { cont.innerHTML = '<div class="empty" style="padding:32px;grid-column:1/-1;">Sin pedidos hoy</div>'; return; }
 
-  const esAdmin     = SESSION?.rol === 'admin';
-  const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado' };
-  const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr' };
-  const canalIcon   = { mesa:'🪑', llevar:'🛍️', app:'📱' };
-  const pagoLabel   = { por_pagar:'Por cobrar', pagado:'Pagado' };
-  const pagoBadge   = { por_pagar:'ba', pagado:'bg' };
+  const activos  = lista.filter(p => p.pago_estado !== 'pagado');
+  const cobrados = lista.filter(p => p.pago_estado === 'pagado');
 
-  cont.innerHTML = lista.map(p => {
+  const renderCard = (p, cobrado = false) => {
+    const esAdmin     = SESSION?.rol === 'admin';
+    const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado' };
+    const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr' };
+    const canalIcon   = { mesa:'🪑', llevar:'🛍️', app:'📱' };
+    const pagoLabel   = { por_pagar:'Por cobrar', pagado:'Pagado' };
+    const pagoBadge   = { por_pagar:'ba', pagado:'bg' };
     const mesaDisplay   = p.canal === 'mesa' ? `Mesa ${p.mesa}` : p.canal === 'llevar' ? 'Para llevar' : 'App';
     const metodoBadge   = p.metodo_pago ? `<span style="font-size:13px;">${p.metodo_pago === 'efectivo' ? '💵' : '💳'}</span>` : '';
     const pagoInfo      = p.pago_estado
@@ -1404,21 +1421,15 @@ async function cargarHistorial() {
           ${metodoBadge}
           ${p.comensales ? `<span style="color:var(--t2);margin-left:auto;">👥 ${p.comensales === 7 ? '6+' : p.comensales}</span>` : ''}
         </div>` : '';
-
-    const btnVer    = `<button class="btn btn-sm" onclick="verItemsPedido(${p.id})" title="Ver ítems">📋</button>`;
-    const btnEntrega = p.estado === 'listo'
-      ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id},'${p.canal}')">✓ Entregar</button>` : '';
-    const btnCobrar = p.pago_estado === 'por_pagar'
-      ? `<button class="btn btn-sm btn-gn" onclick="abrirModalCobro(${p.id},${p.total})">💰 Cobrar</button>` : '';
+    const btnVer     = `<button class="btn btn-sm" onclick="verItemsPedido(${p.id})" title="Ver ítems">📋</button>`;
+    const btnEntrega = p.estado === 'listo' ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id},'${p.canal}')">✓ Entregar</button>` : '';
+    const btnCobrar  = p.pago_estado === 'por_pagar' ? `<button class="btn btn-sm btn-gn" onclick="abrirModalCobro(${p.id},${p.total})">💰 Cobrar</button>` : '';
     const puedeRonda = (p.canal === 'mesa' || p.canal === 'llevar') && p.estado !== 'cancelado' && p.pago_estado !== 'pagado';
-    const btnRonda  = puedeRonda ? `<button class="btn btn-sm" onclick="activarModoRonda(${p.id},'${p.mesa || ''}',${p.total})" title="Agregar ronda">➕</button>` : '';
-    const btnMesa   = p.canal === 'mesa' && p.estado !== 'cancelado' && esAdmin
-      ? `<button class="btn btn-sm" onclick="abrirCambiarMesa(${p.id})" title="Cambiar mesa">↔️</button>` : '';
-    const btnCancel = esAdmin && p.estado !== 'cancelado'
-      ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" title="Cancelar">✕</button>` : '';
-
+    const btnRonda   = puedeRonda ? `<button class="btn btn-sm" onclick="activarModoRonda(${p.id},'${p.mesa || ''}',${p.total})" title="Agregar ronda">➕</button>` : '';
+    const btnMesa    = p.canal === 'mesa' && p.estado !== 'cancelado' && esAdmin ? `<button class="btn btn-sm" onclick="abrirCambiarMesa(${p.id})" title="Cambiar mesa">↔️</button>` : '';
+    const btnCancel  = esAdmin && p.estado !== 'cancelado' ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" title="Cancelar">✕</button>` : '';
     return `
-      <div class="hist-card ${p.estado}">
+      <div class="hist-card ${p.estado}${cobrado ? ' hist-card-cobrado' : ''}">
         <div class="hist-card-head">
           <div>
             <div class="hist-mesa">${mesaDisplay}</div>
@@ -1426,20 +1437,26 @@ async function cargarHistorial() {
           </div>
           <div style="text-align:right;">
             <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;color:var(--t);">$${parseFloat(p.total).toFixed(0)}</div>
-            <div style="margin-top:4px;"><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado]}</span></div>
+            <div style="margin-top:4px;"><span class="badge ${estadoBadge[p.estado]||'bgr'}">${estadoLabel[p.estado]||p.estado}</span></div>
           </div>
         </div>
         ${pagoInfo}
-        <div class="hist-card-actions">
-          ${btnVer}${btnEntrega}${btnCobrar}${btnRonda}${btnMesa}${btnCancel}
-        </div>
+        <div class="hist-card-actions">${btnVer}${btnEntrega}${btnCobrar}${btnRonda}${btnMesa}${btnCancel}</div>
         <div class="detail-row" id="det-row-${p.id}">
-          <div class="detail-cell">
-            <div class="detail-items" id="det-items-${p.id}"><span style="color:var(--t3);">Cargando...</span></div>
-          </div>
+          <div class="detail-cell"><div class="detail-items" id="det-items-${p.id}"><span style="color:var(--t3);">Cargando...</span></div></div>
         </div>
       </div>`;
-  }).join('');
+  };
+
+  const seccion = (titulo, color, items, cobrado) => items.length ? `
+    <div class="hist-section-title">
+      <span class="hist-section-dot" style="background:${color};"></span>${titulo} (${items.length})
+    </div>
+    ${items.map(p => renderCard(p, cobrado)).join('')}` : '';
+
+  cont.innerHTML =
+    seccion('Activos', 'var(--gn)', activos, false) +
+    seccion('Cobrados', 'var(--t3)', cobrados, true);
 }
 
 // ── MENÚ COLAPSABLE ───────────────────────────────────
@@ -3044,80 +3061,40 @@ async function confirmarCobro(metodo) {
 
 // ── CIERRE DE CAJA ────────────────────────────────────
 async function abrirCierreDia() {
+  document.getElementById('mov-resumen').classList.add('open');
+  const cont = document.getElementById('resumen-contenido');
+  cont.innerHTML = '<div class="empty">Cargando resumen...</div>';
+
   const ahora     = new Date();
   const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
   const { data } = await sb.from('pedidos').select('*')
-    .gte('created_at', inicioDia.toISOString()).order('created_at', { ascending: true });
-  const lista     = data || [];
-  const activos   = lista.filter(p => p.estado !== 'cancelado');
-  const entregados = activos.filter(p => p.estado === 'entregado');
-  const total     = activos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
-  const efectivo  = activos.filter(p => p.metodo_pago === 'efectivo').reduce((s,p) => s + parseFloat(p.total||0), 0);
-  const tarjeta   = activos.filter(p => p.metodo_pago === 'tarjeta').reduce((s,p) => s + parseFloat(p.total||0), 0);
-  const porCobrar = activos.filter(p => p.pago_estado === 'por_pagar').reduce((s,p) => s + parseFloat(p.total||0), 0);
-  const ticket    = activos.length ? total / activos.length : 0;
-  const fechaStr  = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    .gte('created_at', inicioDia.toISOString()).order('created_at', { ascending: false });
 
-  const fmt = n => '$' + parseFloat(n).toLocaleString('es-MX', { minimumFractionDigits: 2 });
+  const lista      = data || [];
+  const activos    = lista.filter(p => p.estado !== 'cancelado');
+  const total      = activos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
+  const efectivo   = activos.filter(p => p.metodo_pago === 'efectivo').reduce((s,p) => s + parseFloat(p.total||0), 0);
+  const tarjeta    = activos.filter(p => p.metodo_pago === 'tarjeta').reduce((s,p) => s + parseFloat(p.total||0), 0);
+  const porCobrar  = activos.filter(p => p.pago_estado === 'por_pagar').reduce((s,p) => s + parseFloat(p.total||0), 0);
+  const ticket     = activos.length ? total / activos.length : 0;
+  const fmt        = n => '$' + parseFloat(n).toLocaleString('es-MX', { minimumFractionDigits: 0 });
+  const fechaStr   = ahora.toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
 
-  const filas = activos.map(p => `
-    <tr>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">#${p.id}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">${p.canal === 'mesa' ? `Mesa ${p.mesa}` : p.canal}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">${p.estado}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;">${p.metodo_pago ? (p.metodo_pago === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta') : '—'}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:12px;text-align:right;font-family:monospace;">${fmt(p.total)}</td>
-    </tr>`).join('');
-
-  const html = `
-    <div style="max-width:600px;margin:0 auto;padding:20px;font-family:'DM Sans',sans-serif;">
-      <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:22px;font-weight:700;color:#C0521A;">🍽️ ERP Restaurante</div>
-        <div style="font-size:13px;color:#6B6860;margin-top:4px;">Cierre del día — ${fechaStr}</div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
-        <div style="background:#F5F4F0;border-radius:8px;padding:12px 16px;">
-          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">Total ventas</div>
-          <div style="font-size:24px;font-weight:700;font-family:monospace;color:#C0521A;">${fmt(total)}</div>
-        </div>
-        <div style="background:#F5F4F0;border-radius:8px;padding:12px 16px;">
-          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">Ticket promedio</div>
-          <div style="font-size:24px;font-weight:700;font-family:monospace;">${fmt(ticket)}</div>
-        </div>
-        <div style="background:#E8F5EE;border-radius:8px;padding:12px 16px;">
-          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">💵 Efectivo</div>
-          <div style="font-size:20px;font-weight:700;font-family:monospace;color:#1A7A52;">${fmt(efectivo)}</div>
-        </div>
-        <div style="background:#F0EAFA;border-radius:8px;padding:12px 16px;">
-          <div style="font-size:11px;color:#9E9C97;text-transform:uppercase;letter-spacing:.05em;">💳 Tarjeta / TDC</div>
-          <div style="font-size:20px;font-weight:700;font-family:monospace;color:#4A2A8A;">${fmt(tarjeta)}</div>
-        </div>
-      </div>
-      ${porCobrar > 0 ? `<div style="background:#FDF3DC;border:1px solid #8A5C00;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;">⚠️ Por cobrar: <strong>${fmt(porCobrar)}</strong></div>` : ''}
-      <div style="font-size:12px;color:#6B6860;margin-bottom:8px;font-weight:600;">${activos.length} pedidos activos del día</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:#EFEDE8;">
-          <th style="padding:6px 8px;text-align:left;">#</th>
-          <th style="padding:6px 8px;text-align:left;">Mesa/Canal</th>
-          <th style="padding:6px 8px;text-align:left;">Estado</th>
-          <th style="padding:6px 8px;text-align:left;">Método</th>
-          <th style="padding:6px 8px;text-align:right;">Total</th>
-        </tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
-      <div class="no-print" style="margin-top:24px;text-align:center;">
-        <button onclick="window.print()" style="padding:10px 24px;background:#C0521A;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;">🖨 Imprimir</button>
-        <button onclick="window.close()" style="margin-left:12px;padding:10px 24px;background:#EFEDE8;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;">Cerrar</button>
-      </div>
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--t2);margin-bottom:14px;text-align:center;">${fechaStr}</div>
+    <div class="dash-sc-grid" style="margin-bottom:16px;">
+      <div class="sc acc"><div class="sc-label">Total ventas</div><div class="sc-val">${fmt(total)}</div></div>
+      <div class="sc"><div class="sc-label">Pedidos</div><div class="sc-val" style="color:var(--t);">${activos.length}</div></div>
+      <div class="sc gn"><div class="sc-label">💵 Efectivo</div><div class="sc-val">${fmt(efectivo)}</div></div>
+      <div class="sc"><div class="sc-label">💳 Tarjeta</div><div class="sc-val" style="color:var(--pu);">${fmt(tarjeta)}</div></div>
+    </div>
+    ${porCobrar > 0 ? `<div class="alerta-am" style="margin-bottom:12px;">⚠️ Por cobrar: <strong>${fmt(porCobrar)}</strong></div>` : ''}
+    <div style="font-size:12px;color:var(--t2);margin-bottom:6px;">Ticket promedio: <strong>${fmt(ticket)}</strong></div>
+    <div style="text-align:right;margin-top:16px;">
+      <button class="btn btn-sm" onclick="window.print()">🖨 Imprimir</button>
     </div>`;
-
-  const ventana = window.open('', '_blank', 'width=700,height=800');
-  ventana.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cierre del día</title>
-    <style>body{margin:0;background:#fff;} @media print{.no-print{display:none!important;}}</style>
-    </head><body>${html}</body></html>`);
-  ventana.document.close();
 }
-
+  const lista     = data || [];
 // ── CATEGORÍAS ADMIN ─────────────────────────────────
 async function renderCategoriasAdmin() {
   const cont = document.getElementById('cat-admin-lista');
