@@ -3094,7 +3094,7 @@ async function abrirCierreDia() {
       <button class="btn btn-sm" onclick="window.print()">🖨 Imprimir</button>
     </div>`;
 }
-  const lista     = data || [];
+
 // ── CATEGORÍAS ADMIN ─────────────────────────────────
 async function renderCategoriasAdmin() {
   const cont = document.getElementById('cat-admin-lista');
@@ -3376,16 +3376,24 @@ function toast(msg, tipo = '') {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── BOOT ──────────────────────────────────────────────
-(async function boot() {
-  // Listener para capturar actualizaciones automáticas de token/sesión
-  sb.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user && !SESSION) {
+// ── PERSISTENCIA DE SESIÓN ──────────────────────────
+// 1. Listener para eventos de autenticación (se ejecuta al cargar)
+sb.auth.onAuthStateChange(async (event, session) => {
+  if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
+    if (!SESSION) {
       await initSession(session.user.id);
     }
-  });
+  }
+  // Si se cierra sesión desde otro lado, limpiar el estado
+  if (event === 'SIGNED_OUT') {
+    SESSION = null;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('auth-wrap').classList.add('show');
+  }
+});
 
-  // Verificación explícita de la sesión en almacenamiento local al recargar la página
+// 2. Respaldo: si el listener no se disparó a tiempo, intentar recuperar la sesión
+(async function restoreSession() {
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user && !SESSION) {
     await initSession(session.user.id);
