@@ -3095,16 +3095,25 @@ function playBeep() {
   if (!audioEnabled) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.15, 0.3].forEach(delay => {
+    // Secuencia tipo notificación de delivery — tonos graves y fuertes
+    const secuencia = [
+      { freq: 520, inicio: 0,    dur: 0.18, vol: 0.8 },
+      { freq: 520, inicio: 0.22, dur: 0.18, vol: 0.8 },
+      { freq: 660, inicio: 0.44, dur: 0.30, vol: 1.0 },
+      { freq: 520, inicio: 0.82, dur: 0.18, vol: 0.8 },
+      { freq: 660, inicio: 1.08, dur: 0.40, vol: 1.0 },
+    ];
+    secuencia.forEach(({ freq, inicio, dur, vol }) => {
       const osc  = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.connect(gain); gain.connect(audioCtx.destination);
-      osc.frequency.value = 880;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.25, audioCtx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.12);
-      osc.start(audioCtx.currentTime + delay);
-      osc.stop(audioCtx.currentTime + delay + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'square'; // más agresivo que sine
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol, audioCtx.currentTime + inicio);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + inicio + dur);
+      osc.start(audioCtx.currentTime + inicio);
+      osc.stop(audioCtx.currentTime + inicio + dur + 0.05);
     });
   } catch(e) {}
 }
