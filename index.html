@@ -273,6 +273,39 @@ tr:hover td{background:#FAFAF8;}
 .com-btn.ocupada{border-color:var(--am);background:var(--am2);color:var(--am);}
 .com-btn.ocupada.active{border-color:var(--acc);background:var(--acc);color:#fff;}
 
+/* ── TABLET PORTRAIT ────────────────────────────────── */
+@media (max-width: 820px) and (orientation: portrait) {
+  /* Nav compacto */
+  .nav-brand span { display:none; }
+  .ntb { padding:5px 8px; font-size:12px; }
+
+  /* Pedidos: columna única con panel de orden fijo abajo */
+  .pedidos-layout { grid-template-columns:1fr; gap:8px; padding-bottom:260px; }
+  .order-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 90;
+    border-radius: var(--r) var(--r) 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.12);
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .order-items { max-height: 100px; }
+
+  /* Mesa y comensales más compactos */
+  .com-btn { width: 40px; height: 40px; font-size: 14px; }
+  .canal-btn { font-size: 12px; padding: 8px 6px; }
+
+  /* Grid de productos: 3 columnas en portrait */
+  .prod-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .prod-btn { padding: 10px 6px; }
+  .prod-btn-name { font-size: 11px; }
+  .prod-btn-price { font-size: 11px; }
+
+  /* KDS: 1 columna en portrait */
+  .kds-grid { grid-template-columns: 1fr; }
+}
+
 /* ── PRINT ──────────────────────────────────────────── */
 @media print {
   body > *:not(#print-area){display:none!important;}
@@ -342,7 +375,10 @@ tr:hover td{background:#FAFAF8;}
         </div>
         <div id="mesa-wrap">
           <div style="margin-bottom:14px;">
-            <label style="font-size:12px;color:var(--t2);font-weight:500;display:block;margin-bottom:6px;">Mesa</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <label style="font-size:12px;color:var(--t2);font-weight:500;">Mesa</label>
+              <button class="btn btn-sm" onclick="renderMesaGrid()" style="font-size:11px;padding:2px 8px;">↻</button>
+            </div>
             <div class="comensales-grid" id="mesa-grid"></div>
           </div>
           <div>
