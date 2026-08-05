@@ -273,7 +273,24 @@ tr:hover td{background:#FAFAF8;}
 .com-btn.ocupada{border-color:var(--am);background:var(--am2);color:var(--am);}
 .com-btn.ocupada.active{border-color:var(--acc);background:var(--acc);color:#fff;}
 
-/* ── PEDIDOS TOP (Canal + Mesa + Comensales) ───────── */
+/* ── HISTORIAL CARDS ─────────────────────────────── */
+.hist-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;}
+.hist-card{background:var(--surface);border:2px solid var(--bd2);border-radius:var(--r);overflow:hidden;}
+.hist-card.nuevo{border-color:var(--rd);}
+.hist-card.en_preparacion{border-color:var(--am);}
+.hist-card.listo{border-color:var(--gn);}
+.hist-card-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.hist-mesa{font-size:24px;font-weight:700;color:var(--acc);line-height:1.1;}
+.hist-card-actions{display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--bd);flex-wrap:wrap;align-items:center;}
+.hist-card .detail-row.open{display:block;}
+.hist-card .detail-cell{padding:8px 14px;font-size:12px;color:var(--t2);}
+
+/* ── MENÚ TOGGLE ─────────────────────────────────── */
+.menu-toggle-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.btn-toggle-menu{padding:4px 12px;border-radius:20px;border:1px solid var(--bd2);background:var(--surface);font-family:inherit;font-size:12px;cursor:pointer;color:var(--t2);transition:all .15s;}
+.btn-toggle-menu:hover{border-color:var(--acc);color:var(--acc);}
+
+/* ── PEDIDOS TOP ────────────────────────────────────── */
 #pedidos-top{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px;}
 #pedidos-top .canal-sel{margin-bottom:12px;}
 #mesa-wrap-fila{display:flex;gap:20px;flex-wrap:wrap;}
@@ -379,11 +396,16 @@ tr:hover td{background:#FAFAF8;}
   <!-- SPLIT: Productos izquierda / Orden derecha -->
   <div class="pedidos-split">
     <div class="pedidos-izq">
-      <div class="fr" id="caj-cat-chips">
-        <button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>
+      <div class="menu-toggle-bar">
+        <div class="fr" id="caj-cat-chips" style="margin-bottom:0;flex:1;">
+          <button class="chip active" onclick="filtrarCajaCat(null,this)">Todos</button>
+        </div>
+        <button class="btn-toggle-menu" id="btn-toggle-menu" onclick="toggleMenu()">▲ Ocultar menú</button>
       </div>
-      <div class="subcat-row" id="caj-subcat-chips" style="display:none;"></div>
-      <div class="prod-grid" id="prod-grid"></div>
+      <div id="menu-colapsable">
+        <div class="subcat-row" id="caj-subcat-chips" style="display:none;"></div>
+        <div class="prod-grid" id="prod-grid"></div>
+      </div>
     </div>
     <div class="order-panel">
       <div class="order-header" id="order-header-el" style="display:flex;align-items:center;justify-content:space-between;">
@@ -414,14 +436,7 @@ tr:hover td{background:#FAFAF8;}
           <button class="btn btn-sm" onclick="cargarHistorial()">↻ Actualizar</button>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr><th>#</th><th>Canal</th><th>Mesa</th><th>Estado</th><th>Pago</th><th>Total</th><th>Hora</th><th>Acciones</th></tr>
-          </thead>
-          <tbody id="hist-tbody"></tbody>
-        </table>
-      </div>
+      <div class="hist-cards" id="hist-cards"></div>
     </div>
   </div>
 </div>
@@ -958,7 +973,9 @@ let PEDIDO = { canal: 'mesa', mesa: '', mesaNum: null, items: [] };
 let comensalesActual = 1;
 let detalleByPedido  = {};
 let USUARIOS_DATA    = [];
-let RONDA            = null; // { pedidoId, mesa, rondaNum, totalAnterior }
+let RONDA            = null;
+let VENTAS_HOY       = {};
+let menuVisible      = true; // { pedidoId, mesa, rondaNum, totalAnterior }
 
 // ── CONFIRM MODAL ─────────────────────────────────────
 function abrirConfirm(msg, callback, btnLabel = 'Confirmar') {
@@ -1060,6 +1077,7 @@ async function initApp() {
   if (SESSION.rol === 'admin') await cargarDashboard();
   await renderMesaGrid();
   renderComensalesGrid();
+  await cargarVentasHoy();
   iniciarRealtime();
 }
 
@@ -1205,8 +1223,15 @@ function filtrarCajaSubCat(id, el) {
 
 function renderProdGrid() {
   let lista = DB.productos.filter(p => p.activo);
-  if (cajaCatFiltro)  lista = lista.filter(p => p.categoria_id === cajaCatFiltro);
+  if (cajaCatFiltro)   lista = lista.filter(p => p.categoria_id    === cajaCatFiltro);
   if (cajSubCatFiltro) lista = lista.filter(p => p.subcategoria_id === cajSubCatFiltro);
+  // Ordenar por más vendidos hoy, luego alfabético
+  lista.sort((a, b) => {
+    const va = VENTAS_HOY[a.id] || 0;
+    const vb = VENTAS_HOY[b.id] || 0;
+    if (vb !== va) return vb - va;
+    return a.nombre.localeCompare(b.nombre, 'es');
+  });
   const grid = document.getElementById('prod-grid');
   if (!lista.length) { grid.innerHTML = '<div class="empty">Sin productos en esta categoría</div>'; return; }
   grid.innerHTML = lista.map(p => {
@@ -1215,10 +1240,12 @@ function renderProdGrid() {
         <div class="prod-btn-name">${p.nombre}</div>
         <div class="prod-btn-price" style="color:var(--t3);">⚠️ Agotado</div>
       </button>`;
+    const vendidos = VENTAS_HOY[p.id] ? `<div style="font-size:10px;color:var(--t3);margin-top:2px;">⭐ ${VENTAS_HOY[p.id]} hoy</div>` : '';
     return `
       <button class="prod-btn" onclick="agregarItem(${p.id})">
         <div class="prod-btn-name">${p.nombre}</div>
         <div class="prod-btn-price">$${parseFloat(p.precio).toFixed(2)}</div>
+        ${vendidos}
       </button>`;
   }).join('');
 }
@@ -1335,16 +1362,16 @@ async function enviarPedido() {
   toast(`Pedido #${pedido.id} enviado a cocina ✓`, 'ok');
   limpiarPedido();
   document.getElementById('order-notas').value = '';
+  cargarVentasHoy(); // actualizar ranking de más vendidos
   await cargarHistorial();
 }
 
 // ── HISTORIAL ─────────────────────────────────────────
 async function cargarHistorial() {
-  const tbody = document.getElementById('hist-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--t3);font-size:13px;">Cargando...</td></tr>';
+  const cont = document.getElementById('hist-cards');
+  if (!cont) return;
+  cont.innerHTML = '<div style="padding:24px;color:var(--t3);font-size:13px;text-align:center;grid-column:1/-1;">Cargando...</div>';
 
-  // Medianoche local → evita mostrar pedidos de ayer
   const ahora     = new Date();
   const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
 
@@ -1354,70 +1381,92 @@ async function cargarHistorial() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="8" style="padding:16px;color:var(--rd);font-size:13px;">Error al cargar: ${error.message}</td></tr>`;
-    console.error('cargarHistorial error:', error);
+    cont.innerHTML = `<div style="padding:16px;color:var(--rd);font-size:13px;grid-column:1/-1;">Error: ${error.message}</div>`;
     return;
   }
 
-  const lista = data || [];
-  const activos = lista.filter(p => p.estado !== 'cancelado');
-  if (!activos.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin pedidos activos en las últimas 24 horas</td></tr>'; return; }
+  const lista   = (data || []).filter(p => p.estado !== 'cancelado');
+  if (!lista.length) { cont.innerHTML = '<div class="empty" style="padding:32px;grid-column:1/-1;">Sin pedidos activos hoy</div>'; return; }
 
-  const estadoLabel  = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
-  const estadoBadge  = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr', cancelado:'bgr' };
-  const canalLabel   = { mesa:'🪑 Mesa', llevar:'🛍️ Llevar', app:'📱 App' };
-  const pagoLabel    = { por_pagar:'Por pagar', pagado:'Pagado' };
-  const pagoBadge    = { por_pagar:'ba', pagado:'bg' };
+  const esAdmin     = SESSION?.rol === 'admin';
+  const estadoLabel = { nuevo:'Nuevo', en_preparacion:'En prep.', listo:'Listo', entregado:'Entregado' };
+  const estadoBadge = { nuevo:'br', en_preparacion:'ba', listo:'bg', entregado:'bgr' };
+  const canalIcon   = { mesa:'🪑', llevar:'🛍️', app:'📱' };
+  const pagoLabel   = { por_pagar:'Por cobrar', pagado:'Pagado' };
+  const pagoBadge   = { por_pagar:'ba', pagado:'bg' };
 
-  tbody.innerHTML = activos.map(p => {
-    const esAdmin = SESSION?.rol === 'admin';
-    const metodoBadge = p.metodo_pago
-      ? `<span class="badge ${p.metodo_pago === 'efectivo' ? 'bg' : 'bpu'}" style="font-size:10px;margin-left:4px;">${p.metodo_pago === 'efectivo' ? '💵' : '💳'}</span>`
-      : '';
-    const pagoCell = p.pago_estado
-      ? `<span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>${metodoBadge}
-         ${p.pago_estado === 'por_pagar' ? `<br><button class="btn btn-sm btn-gn" onclick="abrirModalCobro(${p.id},${p.total})" style="margin-top:4px;">Cobrar</button>` : ''}`
-      : '—';
+  cont.innerHTML = lista.map(p => {
+    const mesaDisplay   = p.canal === 'mesa' ? `Mesa ${p.mesa}` : p.canal === 'llevar' ? 'Para llevar' : 'App';
+    const metodoBadge   = p.metodo_pago ? `<span style="font-size:13px;">${p.metodo_pago === 'efectivo' ? '💵' : '💳'}</span>` : '';
+    const pagoInfo      = p.pago_estado
+      ? `<div style="padding:6px 14px;border-top:1px solid var(--bd);display:flex;align-items:center;gap:8px;font-size:12px;">
+          <span class="badge ${pagoBadge[p.pago_estado]}">${pagoLabel[p.pago_estado]}</span>
+          ${metodoBadge}
+          ${p.comensales ? `<span style="color:var(--t2);margin-left:auto;">👥 ${p.comensales === 7 ? '6+' : p.comensales}</span>` : ''}
+        </div>` : '';
 
-    const accionEntrega = p.estado === 'listo'
-      ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id},'${p.canal}')">Entregar</button>`
-      : p.estado === 'entregado' || p.estado === 'cancelado'
-        ? `<span style="color:var(--t3);font-size:12px;">${p.estado === 'cancelado' ? '✕ Cancelado' : '✓ Entregado'}</span>`
-        : '—';
-
-    const puedeRonda = p.canal === 'mesa' && p.estado !== 'cancelado' && p.pago_estado !== 'pagado';
-    const btnRonda   = puedeRonda ? `<button class="btn btn-sm" onclick="activarModoRonda(${p.id},'${p.mesa || ''}',${p.total})" style="margin-left:4px;" title="Agregar ronda">➕</button>` : '';
-    const btnMesa    = p.canal === 'mesa' && p.estado !== 'cancelado' && esAdmin
-      ? `<button class="btn btn-sm" onclick="abrirCambiarMesa(${p.id})" style="margin-left:4px;" title="Cambiar mesa">↔️</button>`
-      : '';
-
-    const accionAdmin = esAdmin && p.estado !== 'cancelado'
-      ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" style="margin-left:4px;">Cancelar</button>`
-      : '';
+    const btnVer    = `<button class="btn btn-sm" onclick="verItemsPedido(${p.id})" title="Ver ítems">📋</button>`;
+    const btnEntrega = p.estado === 'listo'
+      ? `<button class="btn btn-sm btn-gn" onclick="marcarEntregado(${p.id},'${p.canal}')">✓ Entregar</button>` : '';
+    const btnCobrar = p.pago_estado === 'por_pagar'
+      ? `<button class="btn btn-sm btn-gn" onclick="abrirModalCobro(${p.id},${p.total})">💰 Cobrar</button>` : '';
+    const puedeRonda = (p.canal === 'mesa' || p.canal === 'llevar') && p.estado !== 'cancelado' && p.pago_estado !== 'pagado';
+    const btnRonda  = puedeRonda ? `<button class="btn btn-sm" onclick="activarModoRonda(${p.id},'${p.mesa || ''}',${p.total})" title="Agregar ronda">➕</button>` : '';
+    const btnMesa   = p.canal === 'mesa' && p.estado !== 'cancelado' && esAdmin
+      ? `<button class="btn btn-sm" onclick="abrirCambiarMesa(${p.id})" title="Cambiar mesa">↔️</button>` : '';
+    const btnCancel = esAdmin && p.estado !== 'cancelado'
+      ? `<button class="btn btn-sm btn-danger" onclick="cancelarPedido(${p.id})" title="Cancelar">✕</button>` : '';
 
     return `
-      <tr>
-        <td class="precio">#${p.id}</td>
-        <td>${canalLabel[p.canal] || p.canal}</td>
-        <td>${p.mesa || '—'}</td>
-        <td><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado] || p.estado}</span></td>
-        <td>${pagoCell}</td>
-        <td class="precio">$${parseFloat(p.total).toFixed(2)}</td>
-        <td style="font-size:12px;color:var(--t2);">${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
-        <td style="white-space:nowrap;display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-          <button class="btn btn-sm" onclick="verItemsPedido(${p.id})" title="Ver ítems del pedido" style="font-size:14px;padding:4px 8px;">📋</button>
-          ${accionEntrega}${btnRonda}${btnMesa}${accionAdmin}
-        </td>
-      </tr>
-      <tr class="detail-row" id="det-row-${p.id}">
-        <td class="detail-cell" colspan="8">
-          <div class="detail-items" id="det-items-${p.id}">
-            <span style="color:var(--t3);font-size:12px;">Cargando ítems...</span>
+      <div class="hist-card ${p.estado}">
+        <div class="hist-card-head">
+          <div>
+            <div class="hist-mesa">${mesaDisplay}</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px;">${canalIcon[p.canal]} #${p.id} · ${new Date(p.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</div>
           </div>
-        </td>
-      </tr>
-    `;
+          <div style="text-align:right;">
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;color:var(--t);">$${parseFloat(p.total).toFixed(0)}</div>
+            <div style="margin-top:4px;"><span class="badge ${estadoBadge[p.estado]}">${estadoLabel[p.estado]}</span></div>
+          </div>
+        </div>
+        ${pagoInfo}
+        <div class="hist-card-actions">
+          ${btnVer}${btnEntrega}${btnCobrar}${btnRonda}${btnMesa}${btnCancel}
+        </div>
+        <div class="detail-row" id="det-row-${p.id}">
+          <div class="detail-cell">
+            <div class="detail-items" id="det-items-${p.id}"><span style="color:var(--t3);">Cargando...</span></div>
+          </div>
+        </div>
+      </div>`;
   }).join('');
+}
+
+// ── MENÚ COLAPSABLE ───────────────────────────────────
+function toggleMenu() {
+  menuVisible = !menuVisible;
+  const el  = document.getElementById('menu-colapsable');
+  const btn = document.getElementById('btn-toggle-menu');
+  if (el)  el.style.display  = menuVisible ? '' : 'none';
+  if (btn) btn.textContent   = menuVisible ? '▲ Ocultar menú' : '▼ Mostrar menú';
+}
+
+// ── MÁS VENDIDOS HOY ─────────────────────────────────
+async function cargarVentasHoy() {
+  const ahora     = new Date();
+  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+  const { data: pedHoy } = await sb.from('pedidos')
+    .select('id').gte('created_at', inicioDia.toISOString())
+    .not('estado', 'in', '(cancelado)');
+  if (!pedHoy?.length) { VENTAS_HOY = {}; return; }
+  const ids = pedHoy.map(p => p.id);
+  const { data: dets } = await sb.from('detalle_pedido')
+    .select('producto_id, cantidad').in('pedido_id', ids);
+  VENTAS_HOY = {};
+  (dets || []).forEach(d => {
+    VENTAS_HOY[d.producto_id] = (VENTAS_HOY[d.producto_id] || 0) + d.cantidad;
+  });
+  renderProdGrid(); // re-renderizar con nuevo orden
 }
 
 // ── VER ÍTEMS DEL PEDIDO ──────────────────────────────
@@ -1467,7 +1516,7 @@ async function verItemsPedido(pedidoId) {
 }
 
 async function marcarEntregado(id, canal) {
-  const pagoEstado = canal === 'app' ? 'pagado' : 'por_pagar';
+  const pagoEstado = 'por_pagar'; // todos los canales requieren cobro manual
   const { error } = await sb.from('pedidos')
     .update({ estado: 'entregado', pago_estado: pagoEstado, updated_at: new Date().toISOString() })
     .eq('id', id);
@@ -1534,14 +1583,34 @@ async function cargarKDS() {
       ? `onclick="marcarEntregadoKDS(${p.id},'${p.canal}')"`
       : `onclick="avanzarEstado(${p.id},'${esNuevo ? 'en_preparacion' : 'listo'}')"`;
     const pendKDS  = esNuevo ? lista.filter(x => x.estado === 'nuevo').length : 0;
-    const items = (p.detalle_pedido || []).map(d => {
-      const rondaBadge = (d.ronda > 1) ? `<span class="badge ba" style="font-size:10px;margin-left:4px;">R${d.ronda}</span>` : '';
-      const notaItem = d.nota
-        ? `<div style="background:var(--am2);border-left:3px solid var(--am);padding:3px 8px 3px 6px;margin:3px 0 3px 24px;font-size:12px;font-weight:500;color:var(--am);border-radius:0 4px 4px 0;">📝 ${d.nota}</div>`
-        : '';
-      return `<div class="kds-item">
-        <span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}${rondaBadge}
-      </div>${notaItem}`;
+    // Agrupar ítems por ronda
+    const porRondaKDS = {};
+    (p.detalle_pedido || []).forEach(d => {
+      const r = d.ronda || 1;
+      if (!porRondaKDS[r]) porRondaKDS[r] = [];
+      porRondaKDS[r].push(d);
+    });
+    const rondaNums = Object.keys(porRondaKDS).map(Number).sort((a,b) => a-b);
+    const maxRondaKDS = Math.max(...rondaNums);
+
+    const items = rondaNums.map(r => {
+      const esNuevaR = r === maxRondaKDS && maxRondaKDS > 1;
+      const esViejaR = r < maxRondaKDS;
+      const lineas   = porRondaKDS[r].map(d => {
+        const notaItem = d.nota
+          ? `<div style="background:var(--am2);border-left:3px solid var(--am);padding:2px 6px;margin:2px 0 2px 28px;font-size:12px;color:var(--am);border-radius:0 4px 4px 0;">📝 ${d.nota}</div>`
+          : '';
+        return `<div class="kds-item" style="${esViejaR ? 'opacity:.35;text-decoration:line-through;' : ''}">
+          <span class="kds-item-qty">${d.cantidad}x</span>${d.productos?.nombre || '—'}
+        </div>${notaItem}`;
+      }).join('');
+      if (rondaNums.length === 1) return lineas;
+      if (esViejaR) return `<div style="margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:3px;">✓ Ronda ${r} — ya preparado</div>
+        ${lineas}</div>`;
+      return `<div style="background:var(--rd2);border-radius:8px;padding:8px 10px;margin-bottom:4px;border:1px solid var(--rd);">
+        <div style="font-size:12px;font-weight:700;color:var(--rd);margin-bottom:6px;">🆕 RONDA ${r} — PREPARAR ESTO</div>
+        ${lineas}</div>`;
     }).join('');
     return `
       <div class="kds-card ${p.estado}">
