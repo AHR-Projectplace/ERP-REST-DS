@@ -186,23 +186,23 @@ tr:hover td{background:#FAFAF8;}
 .kds-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
 .kds-dot{width:8px;height:8px;border-radius:50%;background:var(--rd);animation:pulse 1.5s infinite;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
-.kds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.kds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
 .kds-card{background:var(--surface);border-radius:var(--r);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);}
-.kds-card.nuevo{border:2px solid var(--rd);}
-.kds-card.en_preparacion{border:2px solid var(--am);}
-.kds-card.listo{border:2px solid var(--gn);opacity:.85;}
-.kds-card-head{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}
+.kds-card.nuevo{border:3px solid var(--rd);}
+.kds-card.en_preparacion{border:3px solid var(--am);}
+.kds-card.listo{border:3px solid var(--gn);opacity:.85;}
+.kds-card-head{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;}
 .kds-card.nuevo .kds-card-head{background:var(--rd2);}
 .kds-card.en_preparacion .kds-card-head{background:var(--am2);}
 .kds-card.listo .kds-card-head{background:var(--gn2);}
-.kds-num{font-size:15px;font-weight:700;font-family:'DM Mono',monospace;}
+.kds-num{font-size:20px;font-weight:700;font-family:'DM Mono',monospace;}
 .kds-meta{display:flex;align-items:center;gap:6px;}
-.kds-time{font-size:11px;color:var(--t2);font-family:'DM Mono',monospace;}
-.kds-items{padding:10px 14px;border-bottom:1px solid var(--bd);}
-.kds-item{font-size:13px;padding:4px 0;display:flex;gap:8px;}
-.kds-item-qty{font-weight:700;color:var(--acc);min-width:20px;font-family:'DM Mono',monospace;}
-.kds-notas{padding:8px 14px;font-size:11px;color:var(--am);background:var(--am2);font-style:italic;}
-.kds-action{padding:10px 14px;}
+.kds-time{font-size:13px;color:var(--t2);font-family:'DM Mono',monospace;}
+.kds-items{padding:14px 18px;border-bottom:1px solid var(--bd);}
+.kds-item{font-size:16px;padding:7px 0;display:flex;gap:10px;}
+.kds-item-qty{font-weight:700;color:var(--acc);min-width:30px;font-family:'DM Mono',monospace;font-size:17px;}
+.kds-notas{padding:10px 18px;font-size:13px;color:var(--am);background:var(--am2);font-style:italic;}
+.kds-action{padding:14px 18px;}
 .kds-empty{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:56px;text-align:center;}
 .hist-section{margin-top:24px;}
 
@@ -407,6 +407,7 @@ tr:hover td{background:#FAFAF8;}
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <button class="btn btn-sm" id="btn-audio" onclick="toggleAudio(this)" title="Activar notificación sonora">🔕 Sonido</button>
+      <button class="btn btn-sm" id="btn-notif" onclick="solicitarNotificaciones(this)" title="Activar notificaciones del navegador">🔔 Notificaciones</button>
       <div class="kds-badge"><span class="kds-dot"></span><span id="kds-count">0 pendientes</span></div>
       <button class="btn btn-sm" onclick="cargarKDS()">↻ Actualizar</button>
     </div>
@@ -1088,7 +1089,20 @@ function iniciarRealtime() {
   if (realtimeSub) return;
   realtimeSub = sb.channel('kds-channel')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, (payload) => {
-      if (payload.new?.estado === 'nuevo') playBeep();
+      if (payload.new?.estado === 'nuevo') {
+        playBeep();
+        // Notificación solo si el usuario está en la vista de Cocina
+        const enCocina = document.getElementById('vw-cocina')?.classList.contains('active');
+        if (enCocina && 'Notification' in window && Notification.permission === 'granted') {
+          const mesa  = payload.new.canal === 'mesa' ? ` — Mesa ${payload.new.mesa}` : ` — ${payload.new.canal}`;
+          const total = parseFloat(payload.new.total || 0).toFixed(2);
+          new Notification('🍽️ Pedido nuevo', {
+            body: `#${payload.new.id}${mesa} · $${total}`,
+            tag: `pedido-${payload.new.id}`,
+            requireInteraction: false
+          });
+        }
+      }
       cargarKDS();
       cargarHistorial();
     })
@@ -3071,7 +3085,10 @@ function toggleAudio(el) {
   el.style.background = audioEnabled ? 'var(--gn2)' : '';
   el.style.borderColor = audioEnabled ? 'var(--gn)' : '';
   el.style.color = audioEnabled ? 'var(--gn)' : '';
-  if (audioEnabled) { playBeep(); toast('Notificación sonora activada ✓', 'ok'); }
+  if (audioEnabled) {
+    playBeep();
+    toast('Notificación sonora activada ✓', 'ok');
+  }
 }
 
 function playBeep() {
@@ -3092,7 +3109,30 @@ function playBeep() {
   } catch(e) {}
 }
 
-// ── AGOTADO TEMPORAL ─────────────────────────────────
+async function solicitarNotificaciones(el) {
+  if (!('Notification' in window)) {
+    toast('Tu navegador no soporta notificaciones', 'err'); return;
+  }
+  if (Notification.permission === 'granted') {
+    toast('Notificaciones ya activadas ✓', 'ok');
+    el.textContent = '✅ Notificaciones ON';
+    el.style.background = 'var(--gn2)';
+    el.style.borderColor = 'var(--gn)';
+    el.style.color = 'var(--gn)';
+    return;
+  }
+  const permiso = await Notification.requestPermission();
+  if (permiso === 'granted') {
+    el.textContent = '✅ Notificaciones ON';
+    el.style.background = 'var(--gn2)';
+    el.style.borderColor = 'var(--gn)';
+    el.style.color = 'var(--gn)';
+    new Notification('🍽️ ERP Restaurante', { body: 'Notificaciones activadas para cocina ✓', tag: 'test' });
+    toast('Notificaciones activadas ✓', 'ok');
+  } else {
+    toast('Permiso denegado — actívalo desde la configuración del navegador', 'err');
+  }
+}
 async function toggleAgotado(id, agotado) {
   const hoy  = new Date().toISOString().split('T')[0];
   const payload = agotado
