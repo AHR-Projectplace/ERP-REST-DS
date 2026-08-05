@@ -3378,18 +3378,19 @@ function toast(msg, tipo = '') {
 
 // ── BOOT ──────────────────────────────────────────────
 (async function boot() {
-  // 1. Restaurar sesión existente al recargar la página
+  // Listener para capturar actualizaciones automáticas de token/sesión
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (session?.user && !SESSION) {
+      await initSession(session.user.id);
+    }
+  });
+
+  // Verificación explícita de la sesión en almacenamiento local al recargar la página
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user && !SESSION) {
     await initSession(session.user.id);
   }
-
-  // 2. Escuchar cambios futuros de autenticación
-  sb.auth.onAuthStateChange(async (event, session) => {
-    if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
-      if (!SESSION) {
-        await initSession(session.user.id);
-      }
-    }
-  });
 })();
+</script>
+</body>
+</html>
