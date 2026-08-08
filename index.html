@@ -261,6 +261,11 @@ tr:hover td{background:#FAFAF8;}
 .cobro-btn:hover{transform:scale(1.03);}
 .cobro-ef{background:var(--gn2);border-color:var(--gn);color:var(--gn);}
 .cobro-td{background:var(--pu2);border-color:var(--pu);color:var(--pu);}
+.cobro-pa{background:var(--am2);border-color:var(--am);color:var(--am);}
+.cobro-inp{width:100%;padding:10px 12px;border:2px solid var(--bd2);border-radius:8px;font-family:'DM Mono',monospace;font-size:18px;font-weight:600;text-align:center;outline:none;background:var(--bg);}
+.cobro-inp:focus{border-color:var(--acc);}
+.cobro-inp.ef:focus{border-color:var(--gn);}
+.cobro-inp.td:focus{border-color:var(--pu);}
 
 /* ── CATEGORÍAS ADMIN ──────────────────────────────── */
 .cat-admin-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--bd);}
@@ -791,17 +796,36 @@ tr:hover td{background:#FAFAF8;}
     </div>
     <div class="mob">
       <input type="hidden" id="cobro-pedido-id">
+      <input type="hidden" id="cobro-total-val">
       <div style="text-align:center;margin-bottom:20px;">
         <div style="font-size:12px;color:var(--t2);margin-bottom:4px;">Total a cobrar</div>
         <div style="font-size:36px;font-weight:700;font-family:'DM Mono',monospace;color:var(--acc);" id="cobro-total">$0.00</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <button class="cobro-btn cobro-ef" onclick="confirmarCobro('efectivo')">
-          <span style="font-size:28px;">💵</span>Efectivo
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+        <button class="cobro-btn cobro-ef" onclick="selMetodoCobro('efectivo')">
+          <span style="font-size:24px;">💵</span>Efectivo
         </button>
-        <button class="cobro-btn cobro-td" onclick="confirmarCobro('tarjeta')">
-          <span style="font-size:28px;">💳</span>Tarjeta / TDC
+        <button class="cobro-btn cobro-td" onclick="selMetodoCobro('tarjeta')">
+          <span style="font-size:24px;">💳</span>TDC
         </button>
+        <button class="cobro-btn cobro-pa" onclick="selMetodoCobro('parcial')">
+          <span style="font-size:24px;">⚡</span>Parcial
+        </button>
+      </div>
+      <!-- Panel parcial -->
+      <div id="cobro-parcial-panel" style="display:none;border-top:1px solid var(--bd);padding-top:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:11px;color:var(--gn);font-weight:600;display:block;margin-bottom:4px;">💵 Efectivo</label>
+            <input class="cobro-inp ef" id="cobro-ef-monto" type="number" min="0" step="1" placeholder="$0" oninput="calcularRestoParcial()">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--pu);font-weight:600;display:block;margin-bottom:4px;">💳 Tarjeta</label>
+            <input class="cobro-inp td" id="cobro-td-monto" type="number" min="0" step="1" placeholder="$0" readonly>
+          </div>
+        </div>
+        <div id="cobro-parcial-msg" style="font-size:12px;text-align:center;margin-bottom:10px;color:var(--t2);">Ingresa el monto en efectivo</div>
+        <button class="btn btn-p" style="width:100%;" onclick="confirmarCobroParcial()">Confirmar pago parcial</button>
       </div>
     </div>
   </div>
@@ -935,6 +959,7 @@ tr:hover td{background:#FAFAF8;}
             <option value="Otro">Otro</option>
           </select>
         </div>
+      </div>
       <div class="frow">
         <div class="fld">
           <label class="flbl">Fecha *</label>
@@ -1503,7 +1528,7 @@ async function verItemsPedido(pedidoId) {
   cont.innerHTML = '<span style="color:var(--t3);font-size:12px;">Cargando...</span>';
 
   const { data, error } = await sb.from('detalle_pedido')
-    .select('cantidad, nota, ronda, productos(nombre)')
+    .select('id, cantidad, nota, ronda, cancelado, productos(nombre)')
     .eq('pedido_id', pedidoId)
     .order('ronda', { ascending: true });
 
@@ -1512,7 +1537,7 @@ async function verItemsPedido(pedidoId) {
     return;
   }
 
-  // Agrupar por ronda
+  const esAdmin = SESSION?.rol === 'admin';
   const porRonda = {};
   data.forEach(d => {
     const r = d.ronda || 1;
@@ -1522,14 +1547,45 @@ async function verItemsPedido(pedidoId) {
 
   const rondas = Object.keys(porRonda).sort((a,b) => a-b);
   cont.innerHTML = rondas.map(r => {
-    const items   = porRonda[r];
-    const header  = rondas.length > 1 ? `<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-right:6px;">Ronda ${r}:</span>` : '';
-    const tags    = items.map(d => {
-      const nota = d.nota ? ` <span style="color:var(--am);font-style:italic;">→ ${d.nota}</span>` : '';
-      return `<span class="detail-tag">${d.cantidad}× ${d.productos?.nombre || '?'}${nota}</span>`;
+    const items  = porRonda[r];
+    const header = rondas.length > 1 ? `<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-right:6px;">Ronda ${r}:</span>` : '';
+    const tags   = items.map(d => {
+      const cancelStyle = d.cancelado ? 'opacity:.4;text-decoration:line-through;' : '';
+      const nota  = d.nota ? ` <span style="color:var(--am);font-style:italic;">→ ${d.nota}</span>` : '';
+      const btnX  = esAdmin && !d.cancelado
+        ? `<button onclick="cancelarItemDetalle(${d.id},${pedidoId})" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:12px;padding:0 2px;margin-left:4px;" title="Cancelar ítem">✕</button>`
+        : '';
+      return `<span class="detail-tag" style="${cancelStyle}">${d.cantidad}× ${d.productos?.nombre || '?'}${nota}${btnX}</span>`;
     }).join('');
     return `<div style="margin-bottom:${rondas.length > 1 ? '6px' : '0'};">${header}${tags}</div>`;
   }).join('');
+}
+
+async function cancelarItemDetalle(itemId, pedidoId) {
+  if (!confirm('¿Cancelar este ítem del pedido?')) return;
+  // Borrado lógico del ítem
+  const { error } = await sb.from('detalle_pedido')
+    .update({ cancelado: true }).eq('id', itemId);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+
+  // Recalcular total del pedido sumando solo ítems no cancelados
+  const { data: dets } = await sb.from('detalle_pedido')
+    .select('cantidad, precio_unitario, cancelado')
+    .eq('pedido_id', pedidoId);
+  const nuevoTotal = (dets || [])
+    .filter(d => !d.cancelado)
+    .reduce((s, d) => s + d.cantidad * parseFloat(d.precio_unitario || 0), 0);
+  await sb.from('pedidos').update({ total: nuevoTotal }).eq('id', pedidoId);
+
+  toast('Ítem cancelado ✓', 'ok');
+  await logAction('item_cancelado', 'detalle_pedido', itemId, `Pedido #${pedidoId}`);
+  // Recargar el detalle del acordeón
+  const cont = document.getElementById(`det-items-${pedidoId}`);
+  if (cont) {
+    const detRow = document.getElementById(`det-row-${pedidoId}`);
+    if (detRow) detRow.classList.remove('open');
+  }
+  await cargarHistorial();
 }
 
 async function marcarEntregado(id, canal) {
@@ -1542,11 +1598,13 @@ async function marcarEntregado(id, canal) {
   await cargarHistorial();
 }
 
-async function marcarPagado(id, metodo = 'efectivo') {
+async function marcarPagado(id, metodo = 'efectivo', montoEf = 0, montoTd = 0) {
   const { error } = await sb.from('pedidos')
-    .update({ pago_estado: 'pagado', metodo_pago: metodo }).eq('id', id);
+    .update({ pago_estado: 'pagado', metodo_pago: metodo,
+              monto_efectivo: montoEf, monto_tarjeta: montoTd }).eq('id', id);
   if (error) { toast('Error: ' + error.message, 'err'); return; }
-  toast(`Pago registrado — ${metodo === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta'} ✓`, 'ok');
+  const label = metodo === 'efectivo' ? '💵 Efectivo' : metodo === 'tarjeta' ? '💳 Tarjeta' : `⚡ Parcial ($${montoEf.toFixed(0)} ef / $${montoTd.toFixed(0)} td)`;
+  toast(`Pago registrado — ${label} ✓`, 'ok');
   await cargarHistorial();
 }
 
@@ -3047,16 +3105,60 @@ function renderProductosSinMovimiento() {
 // ── MODAL COBRO ───────────────────────────────────────
 function abrirModalCobro(id, total) {
   document.getElementById('cobro-pedido-id').value = id;
+  document.getElementById('cobro-total-val').value  = total;
   document.getElementById('cobro-total').textContent = '$' + parseFloat(total).toFixed(2);
+  document.getElementById('cobro-parcial-panel').style.display = 'none';
+  document.getElementById('cobro-ef-monto').value = '';
+  document.getElementById('cobro-td-monto').value = '';
+  document.getElementById('cobro-parcial-msg').textContent = 'Ingresa el monto en efectivo';
   document.getElementById('mov-cobro').classList.add('open');
 }
 function cerrarModalCobro() {
   document.getElementById('mov-cobro').classList.remove('open');
 }
-async function confirmarCobro(metodo) {
-  const id = document.getElementById('cobro-pedido-id').value;
+function selMetodoCobro(metodo) {
+  if (metodo === 'parcial') {
+    document.getElementById('cobro-parcial-panel').style.display = 'block';
+    document.getElementById('cobro-ef-monto').focus();
+    return;
+  }
+  document.getElementById('cobro-parcial-panel').style.display = 'none';
+  confirmarCobro(metodo);
+}
+function calcularRestoParcial() {
+  const total  = parseFloat(document.getElementById('cobro-total-val').value) || 0;
+  const ef     = parseFloat(document.getElementById('cobro-ef-monto').value) || 0;
+  const resto  = Math.max(0, total - ef);
+  document.getElementById('cobro-td-monto').value = resto > 0 ? resto.toFixed(2) : '';
+  const msg    = document.getElementById('cobro-parcial-msg');
+  if (ef > total) {
+    msg.textContent = '⚠️ El monto excede el total';
+    msg.style.color = 'var(--rd)';
+  } else if (ef === total) {
+    msg.textContent = 'Pago completo en efectivo';
+    msg.style.color = 'var(--gn)';
+  } else {
+    msg.textContent = `Resto en tarjeta: $${resto.toFixed(2)}`;
+    msg.style.color = 'var(--t2)';
+  }
+}
+async function confirmarCobroParcial() {
+  const id     = document.getElementById('cobro-pedido-id').value;
+  const total  = parseFloat(document.getElementById('cobro-total-val').value) || 0;
+  const ef     = parseFloat(document.getElementById('cobro-ef-monto').value) || 0;
+  const td     = parseFloat(document.getElementById('cobro-td-monto').value) || 0;
+  if (ef <= 0) { toast('Ingresa el monto en efectivo', 'err'); return; }
+  if (Math.abs(ef + td - total) > 0.01) { toast('Los montos no suman el total', 'err'); return; }
   cerrarModalCobro();
-  await marcarPagado(parseInt(id), metodo);
+  await marcarPagado(parseInt(id), 'parcial', ef, td);
+}
+async function confirmarCobro(metodo) {
+  const id    = document.getElementById('cobro-pedido-id').value;
+  const total = parseFloat(document.getElementById('cobro-total-val').value) || 0;
+  cerrarModalCobro();
+  const ef = metodo === 'efectivo' ? total : 0;
+  const td = metodo === 'tarjeta'  ? total : 0;
+  await marcarPagado(parseInt(id), metodo, ef, td);
 }
 
 // ── CIERRE DE CAJA ────────────────────────────────────
